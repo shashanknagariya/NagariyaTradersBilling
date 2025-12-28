@@ -1,0 +1,570 @@
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, ActivityIndicator, Alert, Platform, Modal, TextInput, ScrollView } from 'react-native';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
+import { WebView } from 'react-native-webview';
+import client from '../api/client';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { useAuth } from '../context/AuthContext';
+
+const GST_STATE_CODES = {
+    "01": "Jammu and Kashmir", "02": "Himachal Pradesh", "03": "Punjab", "04": "Chandigarh", "05": "Uttarakhand",
+    "06": "Haryana", "07": "Delhi", "08": "Rajasthan", "09": "Uttar Pradesh", "10": "Bihar",
+    "11": "Sikkim", "12": "Arunachal Pradesh", "13": "Nagaland", "14": "Manipur", "15": "Mizoram",
+    "16": "Tripura", "17": "Meghalaya", "18": "Assam", "19": "West Bengal", "20": "Jharkhand",
+    "21": "Odisha", "22": "Chhattisgarh", "23": "Madhya Pradesh", "24": "Gujarat",
+    "25": "Daman and Diu", "26": "Dadra and Nagar Haveli", "27": "Maharashtra",
+    "28": "Andhra Pradesh", "29": "Karnataka", "30": "Goa", "31": "Lakshadweep", "32": "Kerala",
+    "33": "Tamil Nadu", "34": "Puducherry", "35": "Andaman and Nicobar Islands", "36": "Telangana",
+    "37": "Andhra Pradesh (New)", "38": "Ladakh", "97": "Other Territory", "99": "Centre Jurisdiction"
+};
+
+const BillViewScreen = () => {
+    const route = useRoute();
+    const navigation = useNavigation();
+    const { userInfo } = useAuth();
+    const isAdmin = userInfo?.role === 'admin';
+    const { transactionId } = route.params;
+
+    const [billData, setBillData] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [htmlContent, setHtmlContent] = useState('');
+
+    // Master Data Maps
+    const [grains, setGrains] = useState({});
+    const [contacts, setContacts] = useState({});
+    const [warehouses, setWarehouses] = useState({});
+
+    // Payment History
+    const [paymentHistory, setPaymentHistory] = useState([]);
+
+    // Aggregates
+    const [totalQty, setTotalQty] = useState(0);
+    const [totalAmt, setTotalAmt] = useState(0);
+    const [mainTrx, setMainTrx] = useState(null);
+    const [showProfit, setShowProfit] = useState(false);
+
+    useEffect(() => {
+        fetchData();
+    }, []);
+
+    useEffect(() => {
+        if (mainTrx && !loading) {
+            const html = generateHtml();
+            setHtmlContent(html);
+        }
+    }, [mainTrx, loading, billData, grains, contacts, warehouses, paymentHistory]);
+
+    const fetchData = async () => {
+        try {
+            const [tRes, gRes, cRes, wRes, pRes] = await Promise.all([
+                client.get(`/transactions/bill/${transactionId}`),
+                client.get('/master/grains'),
+                client.get('/master/contacts'),
+                client.get('/master/warehouses'),
+                client.get(`/transactions/${transactionId}/payments`)
+            ]);
+
+            // Map Master Data
+            const gMap = {}; gRes.data.forEach(g => gMap[g.id] = g);
+            const cMap = {}; cRes.data.forEach(c => cMap[c.id] = c);
+            const wMap = {}; wRes.data.forEach(w => wMap[w.id] = w);
+
+            setGrains(gMap);
+            setContacts(cMap);
+            setWarehouses(wMap);
+            setBillData(tRes.data);
+            setPaymentHistory(pRes.data);
+
+            // Calculations
+            if (tRes.data.length > 0) {
+                const main = tRes.data[0];
+                setMainTrx(main);
+
+                const tQty = tRes.data.reduce((sum, item) => sum + item.quantity_quintal, 0);
+                const tAmt = tRes.data.reduce((sum, item) => sum + item.total_amount, 0);
+
+                setTotalQty(tQty);
+                setTotalAmt(tAmt);
+            }
+
+        } catch (e) {
+            console.error(e);
+            Alert.alert("Error", "Failed to load bill details");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const generateHtml = () => {
+        if (!mainTrx) return '';
+        const contact = contacts[mainTrx.contact_id] || {};
+        const grain = grains[mainTrx.grain_id] || {};
+        const isPurchase = mainTrx.type === 'purchase';
+
+        // State & GST Logic
+        const getState = (gst) => {
+            if (!gst || gst.length < 2) return { name: "Madhya Pradesh", code: "23" };
+            const code = gst.substring(0, 2);
+            return { name: GST_STATE_CODES[code] || "Unknown", code };
+        };
+
+        const myState = { name: "Madhya Pradesh", code: "23" };
+        const partyState = isPurchase ? myState : getState(contact.gst_number);
+
+        // Tax Logic
+        const taxPercent = mainTrx.tax_percentage || 0;
+        // Backend stores Total Amount = Basic + Tax.
+        // So Basic = Total / (1 + Rate/100)
+        const grandTotal = totalAmt;
+        const taxableAmount = grandTotal / (1 + (taxPercent / 100));
+        const totalTax = grandTotal - taxableAmount;
+
+        const isIntraState = (partyState.code === '23');
+
+        // Rows HTML
+        const rowsHtml = billData.map((item, index) => {
+            const wh = warehouses[item.warehouse_id]?.name || 'Unknown';
+            const bharti = (item.number_of_bags && item.quantity_quintal)
+                ? ((item.quantity_quintal * 100) / item.number_of_bags).toFixed(2)
+                : '-';
+
+            // We show RATE as ITEM RATE (Basic) or Inclusive?
+            // Usually Sales Bill shows RATE (Basic). 
+            // In DB, `rate_per_quintal` was used to calc subtotal. S it is Basic Rate.
+            // Good.
+
+            return `
+                <tr>
+                    <td style="text-align: center;">${index + 1}</td>
+                    <td>${grain.name} (${grain.hindi_name || ''})<br/><small>Loading: ${wh}</small></td>
+                    <td style="text-align: center;">${item.number_of_bags || '-'}</td>
+                    <td style="text-align: center;">${bharti}</td>
+                    <td style="text-align: right;">${item.quantity_quintal.toFixed(2)} QTL</td>
+                    <td style="text-align: right;">${item.rate_per_quintal.toFixed(2)}</td>
+                    <td style="text-align: right;">${(item.quantity_quintal * item.rate_per_quintal).toFixed(2)}</td>
+                </tr>
+             `;
+        }).join('');
+
+        // Payment History Rows
+        let paymentRows = '';
+        if (paymentHistory.length > 0) {
+            paymentRows = paymentHistory.map(p => `
+                <tr>
+                    <td colspan="6" class="text-right small">Paid on ${new Date(p.date).toLocaleDateString()}</td>
+                    <td class="text-right small">${p.amount.toFixed(2)}</td>
+                </tr>
+            `).join('');
+        }
+
+        // Tax Rows
+        let taxRows = '';
+        if (taxPercent > 0) {
+            if (isIntraState) {
+                // CGST + SGST (Half each)
+                const halfTax = totalTax / 2;
+                const halfRate = taxPercent / 2;
+                taxRows = `
+                    <tr>
+                        <td colspan="6" class="text-right bold">CGST (${halfRate}%)</td>
+                        <td class="text-right">${halfTax.toFixed(2)}</td>
+                    </tr>
+                    <tr>
+                        <td colspan="6" class="text-right bold">SGST (${halfRate}%)</td>
+                        <td class="text-right">${halfTax.toFixed(2)}</td>
+                    </tr>
+                `;
+            } else {
+                // IGST (Full)
+                taxRows = `
+                    <tr>
+                        <td colspan="6" class="text-right bold">IGST (${taxPercent}%)</td>
+                        <td class="text-right">${totalTax.toFixed(2)}</td>
+                    </tr>
+                `;
+            }
+        }
+
+        const transportTable = isPurchase ? `
+            <table class="no-border" style="width: 100%">
+                 <tr>
+                    <td class="no-border">Invoice No.<br/><b>${mainTrx.invoice_number || '-'}</b></td>
+                    <td class="no-border">Dated<br/><b>${new Date(mainTrx.date).toLocaleDateString()}</b></td>
+                </tr>
+                 <tr>
+                    <td class="no-border">Notes<br/>${mainTrx.notes || '-'}</td>
+                    <td class="no-border"></td>
+                </tr>
+            </table>
+        ` : `
+             <table class="no-border" style="width: 100%">
+                <tr>
+                    <td class="no-border">Invoice No.<br/><b>${mainTrx.invoice_number || '-'}</b></td>
+                    <td class="no-border">Dated<br/><b>${new Date(mainTrx.date).toLocaleDateString()}</b></td>
+                </tr>
+                <tr>
+                    <td class="no-border">Delivery Note<br/>-</td>
+                    <td class="no-border">Mode/Terms of Payment<br/>-</td>
+                </tr>
+                <tr>
+                    <td class="no-border">Reference No. & Date.<br/>-</td>
+                    <td class="no-border">Other References<br/>-</td>
+                </tr>
+                <tr>
+                    <td class="no-border">Buyer's Order No.<br/>-</td>
+                    <td class="no-border">Dated<br/>-</td>
+                </tr>
+                <tr>
+                    <td class="no-border">Dispatch Doc No.<br/>-</td>
+                    <td class="no-border">Delivery Note Date<br/>-</td>
+                </tr>
+                <tr>
+                    <td class="no-border">Dispatched through<br/>${mainTrx.vehicle_number || '-'}</td>
+                    <td class="no-border">Destination<br/>${mainTrx.destination || 'KATNI'}</td>
+                </tr>
+            </table>
+        `;
+
+        return `
+            <html>
+                <head>
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+                    <style>
+                        body { font-family: 'Helvetica', sans-serif; font-size: 10px; margin: 0; padding: 10px; }
+                        table { width: 100%; border-collapse: collapse; }
+                        td, th { border: 1px solid black; padding: 4px; vertical-align: top; }
+                        .header { text-align: center; }
+                        .title { font-size: 16px; font-weight: bold; margin-bottom: 5px; }
+                        .company-name { font-size: 14px; font-weight: bold; }
+                        .no-border { border: none; }
+                        .text-right { text-align: right; }
+                        .text-center { text-align: center; }
+                        .bold { font-weight: bold; }
+                        .small { font-size: 9px; color: #555; }
+                        .amount-words { margin-top: 10px; font-weight: bold; border-top: 1px solid black; padding-top: 5px; }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <div class="title">${isPurchase ? 'PURCHASE RECEIPT' : 'TAX INVOICE'}</div>
+                    </div>
+
+                    <table>
+                        <!-- Header Section -->
+                        <tr>
+                            <td colspan="4" width="50%">
+                                <div class="company-name">M/S NAGARIYA TRADERS MAIN ROAD GANJ PROP MAHESH PRASAD NAGARIYA</div>
+                                GANJ<br/>
+                                GSTIN/UIN: 23BEKPN1849B1ZQ<br/>
+                                State Name: Madhya Pradesh, Code: 23<br/>
+                                Contact: 9424785568
+                            </td>
+                            <td colspan="3" width="50%">
+                                ${transportTable}
+                            </td>
+                        </tr>
+
+                        <!-- Consignee Section -->
+                        <tr>
+                            <td colspan="4">
+                                <strong>Consignee (Ship to)</strong><br/>
+                                <b>${isPurchase ? 'Self' : contact.name}</b><br/>
+                                GSTIN/UIN: ${isPurchase ? '23BEKPN1849B1ZQ' : (contact.gst_number || 'Unregistered')}<br/>
+                                State Name: ${partyState.name}, Code: ${partyState.code}
+                            </td>
+                            <td colspan="3">
+                                <strong>${isPurchase ? 'Supplier (Bill from)' : 'Buyer (Bill to)'}</strong><br/>
+                                <b>${contact.name}</b><br/>
+                                GSTIN/UIN: ${contact.gst_number || 'Unregistered'}<br/>
+                                State Name: ${partyState.name}, Code: ${partyState.code}
+                            </td>
+                        </tr>
+
+                        <!-- Items Header -->
+                        <tr class="text-center bold" style="background-color: #f0f0f0;">
+                            <td width="5%">SI No.</td>
+                            <td width="35%">Description of Goods</td>
+                            <td width="10%">Bags</td>
+                            <td width="10%">Bharti</td>
+                            <td width="15%">Quantity</td>
+                            <td width="10%">Rate</td>
+                            <td width="15%">Amount</td>
+                        </tr>
+
+                        <!-- Items Body -->
+                        ${rowsHtml}
+                        
+                        <!-- Empty Rows -->
+                        <tr style="height: 100px;">
+                            <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+                        </tr>
+
+                        <!-- Total -->
+                        <tr>
+                            <td colspan="4" class="text-right bold">Sub Total (Taxable)</td>
+                            <td class="text-right bold">${totalQty.toFixed(2)} QTL</td>
+                            <td></td>
+                            <td class="text-right bold">${taxableAmount.toFixed(2)}</td>
+                        </tr>
+                        
+                        <!-- Tax Rows -->
+                        ${taxRows}
+
+                        <!-- Grand Total -->
+                        <tr>
+                            <td colspan="6" class="text-right bold" style="background-color: #eee;">Grand Total</td>
+                            <td class="text-right bold" style="background-color: #eee;">${grandTotal.toFixed(2)}</td>
+                        </tr>
+
+                        <!-- Payment History (If any) -->
+                         ${paymentRows}
+
+                         <tr>
+                            <td colspan="6" class="text-right bold">Total Amount Paid</td>
+                            <td class="text-right bold">${(mainTrx.amount_paid || 0).toFixed(2)}</td>
+                        </tr>
+                        <tr>
+                            <td colspan="6" class="text-right bold">Balance Due</td>
+                            <td class="text-right bold text-red">${(grandTotal - (mainTrx.amount_paid || 0)).toFixed(2)}</td>
+                        </tr>
+
+                        <!-- Footer -->
+                        <tr>
+                            <td colspan="7">
+                                <div class="amount-words">Item Value: INR ${grandTotal.toFixed(2)} Only</div>
+                                <br/>
+                                <div style="display: flex; justify-content: space-between;">
+                                    <div>
+                                        Tax Amount (in words): ${totalTax > 0 ? totalTax.toFixed(2) : 'NIL'}<br/><br/>
+                                        Declaration:<br/>
+                                        We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.
+                                    </div>
+                                    <div style="text-align: right; border-left: 1px solid black; padding-left: 10px;">
+                                        <br/>
+                                        <strong>for NAGARIYA TRADERS</strong><br/><br/><br/><br/>
+                                        Authorised Signatory
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                </body>
+            </html>
+        `;
+    };
+
+    const generatePdf = async () => {
+        try {
+            const { uri } = await Print.printToFileAsync({ html: htmlContent });
+            await Sharing.shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
+        } catch (error) {
+            console.error(error);
+            Alert.alert("Error", "Failed to generate PDF");
+        }
+    };
+
+    // Helper to calc net receivable
+    const getNetReceivable = (trx) => {
+        if (!trx) return 0;
+        const shortageVal = (trx.shortage_quantity || 0) * trx.rate_per_quintal;
+        const deduct = trx.deduction_amount || 0;
+        return trx.total_amount - shortageVal - deduct;
+    };
+
+    const calculateProfit = (trx) => {
+        if (!trx) return 0;
+        const revenue = getNetReceivable(trx);
+        const cost = (trx.quantity_quintal * trx.cost_price_per_quintal);
+        return revenue - cost;
+    };
+
+    const handleSettle = async () => {
+        if (!mainTrx) return;
+        setSettlementLoading(true);
+        try {
+            // Update Transaction with deduction details
+            await client.put(`/transactions/${mainTrx.id}`, {
+                shortage_quantity: parseFloat(shortageQty) || 0,
+                deduction_amount: parseFloat(deductionAmt) || 0,
+                deduction_note: deductionNote
+            });
+            Alert.alert("Success", "Settlement Updated");
+            setSettlementModalVisible(false);
+            fetchData();
+        } catch (e) {
+            console.error(e);
+            Alert.alert("Error", "Failed to update settlement");
+        } finally {
+            setSettlementLoading(false);
+        }
+    };
+
+    const [settlementModalVisible, setSettlementModalVisible] = useState(false);
+    const [shortageQty, setShortageQty] = useState('0');
+    const [deductionAmt, setDeductionAmt] = useState('0');
+    const [deductionNote, setDeductionNote] = useState('');
+    const [settlementLoading, setSettlementLoading] = useState(false);
+
+    // Initializer for modal
+    const openSettlement = () => {
+        if (mainTrx) {
+            setShortageQty((mainTrx.shortage_quantity || 0).toString());
+            setDeductionAmt((mainTrx.deduction_amount || 0).toString());
+            setDeductionNote(mainTrx.deduction_note || '');
+            setSettlementModalVisible(true);
+        }
+    };
+
+    if (loading) return <ActivityIndicator size="large" className="mt-20" />;
+    if (!mainTrx) return <View className="flex-1 justify-center items-center"><Text>No Data</Text></View>;
+
+    return (
+        <View className="flex-1 bg-gray-50">
+            <View className="bg-brand-navy pt-12 pb-4 px-6 shadow-sm z-10 flex-row items-center justify-between">
+                <View className="flex-row items-center">
+                    <TouchableOpacity onPress={() => navigation.goBack()} className="mr-4">
+                        <Text className="text-white text-2xl">←</Text>
+                    </TouchableOpacity>
+                    <Text className="text-xl font-bold text-white">Bill Preview</Text>
+                </View>
+                <TouchableOpacity onPress={generatePdf} className="bg-brand-gold px-3 py-1 rounded">
+                    <Text className="font-bold text-brand-navy">PDF</Text>
+                </TouchableOpacity>
+            </View>
+
+            <ScrollView className="flex-1">
+                {/* Settlement Card - Sale Only */}
+                {type === 'sale' && (
+                    <View className="mx-4 mt-4 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                        <View className="flex-row justify-between items-center mb-2">
+                            <Text className="font-bold text-lg text-brand-navy">Settlement & Final Amount</Text>
+                            <TouchableOpacity onPress={openSettlement} className="bg-gray-100 px-3 py-1 rounded border border-gray-300">
+                                <Text className="text-xs font-bold text-brand-navy">Edit / Settle</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <View className="flex-row justify-between mb-1">
+                            <Text className="text-gray-600">Billed Amount ({totalQty.toFixed(2)} Qtl):</Text>
+                            <Text className="font-bold">₹ {totalAmt.toFixed(2)}</Text>
+                        </View>
+
+                        {(mainTrx.shortage_quantity > 0 || mainTrx.deduction_amount > 0) && (
+                            <>
+                                <View className="flex-row justify-between mb-1">
+                                    <Text className="text-red-500">(-) Shortage ({mainTrx.shortage_quantity} Qtl):</Text>
+                                    <Text className="text-red-500 font-bold">- ₹ {(mainTrx.shortage_quantity * mainTrx.rate_per_quintal).toFixed(2)}</Text>
+                                </View>
+                                <View className="flex-row justify-between mb-1">
+                                    <Text className="text-red-500">(-) Other Deductions:</Text>
+                                    <Text className="text-red-500 font-bold">- ₹ {mainTrx.deduction_amount.toFixed(2)}</Text>
+                                </View>
+                                <View className="h-[1px] bg-gray-200 my-2" />
+                            </>
+                        )}
+
+                        <View className="flex-row justify-between">
+                            <Text className="font-bold text-brand-navy text-lg">Net Receivable:</Text>
+                            <Text className="font-bold text-brand-navy text-lg">₹ {getNetReceivable(mainTrx).toFixed(2)}</Text>
+                        </View>
+                    </View>
+                )}
+
+                {/* Profit Display (Private) - Admin Only */}
+                {isAdmin && mainTrx?.type === 'sale' && (mainTrx.cost_price_per_quintal > 0) && (
+                    <View className="mx-4 mt-4">
+                        {!showProfit ? (
+                            <TouchableOpacity onPress={() => setShowProfit(true)} className="self-end">
+                                <Text className="text-gray-400 text-xs text-right underline">Show Internal Analysis</Text>
+                            </TouchableOpacity>
+                        ) : (
+                            <View className="bg-green-50 border border-green-200 p-4 rounded-xl flex-row justify-between items-center shadow-sm">
+                                <View>
+                                    <View className="flex-row items-center mb-1">
+                                        <Text className="text-green-800 font-bold text-lg mr-2">Net Profit</Text>
+                                        <TouchableOpacity onPress={() => setShowProfit(false)}>
+                                            <Text className="text-gray-400 text-xs">✕ Hide</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                    <Text className="text-green-600 text-xs">Based on Settlement</Text>
+                                </View>
+                                <Text className={`font-bold text-2xl ${calculateProfit(mainTrx) >= 0 ? 'text-green-700' : 'text-red-600'}`}>
+                                    ₹ {calculateProfit(mainTrx).toFixed(2)}
+                                </Text>
+                            </View>
+                        )}
+                    </View>
+                )}
+
+                <View className="bg-white m-4 shadow-lg rounded-none border border-gray-200 h-[500px]">
+                    {Platform.OS === 'web' ? (
+                        <iframe srcDoc={htmlContent} style={{ width: '100%', height: '100%', border: 'none' }} />
+                    ) : (
+                        <WebView
+                            originWhitelist={['*']}
+                            source={{ html: htmlContent }}
+                            style={{ flex: 1 }}
+                        />
+                    )}
+                </View>
+
+                <TouchableOpacity
+                    className="bg-brand-navy mx-4 mb-6 p-4 rounded-xl items-center shadow-lg active:bg-blue-900"
+                    onPress={generatePdf}
+                >
+                    <Text className="text-white font-bold text-lg">📄 Download / Print PDF</Text>
+                </TouchableOpacity>
+            </ScrollView>
+
+            {/* Settlement Modal */}
+            <Modal visible={settlementModalVisible} transparent animationType="slide" onRequestClose={() => setSettlementModalVisible(false)}>
+                <View className="flex-1 justify-center items-center bg-black/50 px-4">
+                    <View className="bg-white w-full rounded-2xl p-6">
+                        <Text className="text-xl font-bold text-brand-navy mb-4">Update Settlement</Text>
+
+                        <Text className="mb-1 font-bold text-gray-700">Shortage Quantity (Qtl)</Text>
+                        <TextInput
+                            className="border border-gray-300 rounded-lg p-3 mb-4 bg-gray-50 text-lg"
+                            keyboardType="numeric"
+                            value={shortageQty}
+                            onChangeText={setShortageQty}
+                            placeholder="0.00"
+                        />
+
+                        <Text className="mb-1 font-bold text-gray-700">Deduction Amount (₹)</Text>
+                        <TextInput
+                            className="border border-gray-300 rounded-lg p-3 mb-4 bg-gray-50 text-lg"
+                            keyboardType="numeric"
+                            value={deductionAmt}
+                            onChangeText={setDeductionAmt}
+                            placeholder="0.00"
+                        />
+
+                        <Text className="mb-1 font-bold text-gray-700">Note / Reason</Text>
+                        <TextInput
+                            className="border border-gray-300 rounded-lg p-3 mb-6 bg-gray-50 text-lg"
+                            value={deductionNote}
+                            onChangeText={setDeductionNote}
+                            placeholder="e.g. Quality Cut"
+                        />
+
+                        <View className="flex-row justify-end space-x-4">
+                            <TouchableOpacity onPress={() => setSettlementModalVisible(false)} className="p-3">
+                                <Text className="font-bold text-gray-500">Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={handleSettle}
+                                className="bg-brand-gold px-6 py-3 rounded-xl"
+                                disabled={settlementLoading}
+                            >
+                                {settlementLoading ? <ActivityIndicator color="#1e1b4b" /> : <Text className="font-bold text-brand-navy">Update Settlement</Text>}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+        </View>
+    );
+};
+
+export default BillViewScreen;

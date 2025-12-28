@@ -1,0 +1,107 @@
+from typing import Optional
+from sqlmodel import Field, SQLModel
+from datetime import datetime
+
+
+
+class Grain(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(index=True, unique=True)  # Wheat, Rice, etc.
+    hindi_name: Optional[str] = None # Gehu, Chana
+
+class Warehouse(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str
+    location: Optional[str] = None
+
+class Contact(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str
+    type: str  # supplier, buyer, broker
+    phone: Optional[str] = None
+    gst_number: Optional[str] = None
+
+class Transaction(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    date: datetime = Field(default_factory=datetime.utcnow)
+    type: str  # purchase, sale
+    invoice_number: Optional[int] = None
+    
+    grain_id: int = Field(foreign_key="grain.id")
+    contact_id: int = Field(foreign_key="contact.id")
+    warehouse_id: int = Field(foreign_key="warehouse.id")
+    
+    quantity_quintal: float
+    number_of_bags: Optional[float] = None
+    rate_per_quintal: float
+    total_amount: float
+    
+    tax_percentage: float = Field(default=0.0)
+    cost_price_per_quintal: float = Field(default=0.0)
+    amount_paid: float = Field(default=0.0)
+    payment_status: str = Field(default="pending") # pending, paid, partial
+    notes: Optional[str] = None
+
+    # Sale specific details
+    transporter_name: Optional[str] = None
+    destination: Optional[str] = None
+    driver_name: Optional[str] = None
+    vehicle_number: Optional[str] = None
+    sale_group_id: Optional[str] = None # To group multiple rows of a single bill
+    
+    # Settlement / Deductions (Sale only)
+    shortage_quantity: float = Field(default=0.0) # Quantity lost/short
+    deduction_amount: float = Field(default=0.0) # Monetary deduction (quality claim etc)
+    deduction_note: Optional[str] = None
+
+class PaymentHistory(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    transaction_id: int = Field(foreign_key="transaction.id")
+    amount: float
+    date: datetime = Field(default_factory=datetime.utcnow)
+    notes: Optional[str] = None
+
+class User(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    username: str = Field(index=True, unique=True)
+    password_hash: str
+    role: str = Field(default="worker") # 'admin', 'worker'
+    permissions: str = Field(default="[]") # JSON list of allowed modules
+    token_version: int = Field(default=1)
+
+# Pydantic Schemas for API
+class TransactionCreate(SQLModel):
+    date: datetime = Field(default_factory=datetime.utcnow)
+    type: str
+    grain_id: int
+    contact_id: int
+    warehouse_id: int
+    quantity_quintal: float
+    rate_per_quintal: float
+    total_amount: float
+    invoice_number: Optional[int] = None
+    transporter_name: Optional[str] = None
+    driver_name: Optional[str] = None
+    vehicle_number: Optional[str] = None
+    # Deductions optional on create
+    shortage_quantity: Optional[float] = 0.0
+    deduction_amount: Optional[float] = 0.0
+    deduction_note: Optional[str] = None
+
+class TransactionUpdate(SQLModel):
+    date: Optional[datetime] = None
+    quantity_quintal: Optional[float] = None
+    rate_per_quintal: Optional[float] = None
+    total_amount: Optional[float] = None
+    invoice_number: Optional[int] = None
+    transporter_name: Optional[str] = None
+    shortage_quantity: Optional[float] = None
+    deduction_amount: Optional[float] = None
+    deduction_note: Optional[str] = None
+    payment_status: Optional[str] = None
+    amount_paid: Optional[float] = None
+
+class TransactionRead(Transaction):
+    grain_name: str
+    contact_name: str
+    warehouse_name: str
