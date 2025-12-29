@@ -95,9 +95,25 @@ const ReportsScreen = () => {
 
         // 2. Map Extended Fields
         data = data.map(t => {
-            const netAmount = getNetTotal(t);
+            const qty = t.quantity_quintal || 0;
+            const rate = t.rate_per_quintal || 0;
+            const bags = t.number_of_bags || 0;
+
+            const baseAmount = qty * rate; // User requested: Just Qty * Rate
+
+            // Costs
+            const shortageCost = (t.shortage_quantity || 0) * rate;
+            const deductionCost = t.deduction_amount || 0;
+            const labourCostTotal = bags * (t.labour_cost_per_bag || 0);
+            const transportCostTotal = qty * (t.transport_cost_per_qtl || 0);
+
+            // Net Realized: Base - (Shortage + Deduction + Labour + Transport)
+            const netRealized = baseAmount - shortageCost - deductionCost - labourCostTotal - transportCostTotal;
+
+            // Profit (for profit report): Net Realized - Cost Price
+            // (Note: This logic aligns profit with realized amount)
             const profit = (t.type === 'sale')
-                ? netAmount - ((t.cost_price_per_quintal || 0) * t.quantity_quintal)
+                ? netRealized - ((t.cost_price_per_quintal || 0) * qty)
                 : 0;
 
             return {
@@ -105,8 +121,13 @@ const ReportsScreen = () => {
                 contactName: contacts[t.contact_id] || 'Unknown',
                 grainName: grains[t.grain_id] || 'Unknown',
                 warehouseName: warehouses[t.warehouse_id] || 'Unknown',
-                netAmount: netAmount,
-                profit: profit
+                baseAmount,
+                shortageCost,
+                deductionCost,
+                labourCostTotal,
+                transportCostTotal,
+                netRealized,
+                profit
             };
         });
 
@@ -123,7 +144,7 @@ const ReportsScreen = () => {
                     groups[groupKey] = { name: groupKey, qty: 0, amount: 0, profit: 0, count: 0 };
                 }
                 groups[groupKey].qty += t.quantity_quintal;
-                groups[groupKey].amount += t.netAmount; // Use Net Amount
+                groups[groupKey].amount += t.netRealized; // Use Net Realized for grouped view
                 groups[groupKey].profit += t.profit;
                 groups[groupKey].count += 1;
             });
@@ -143,18 +164,24 @@ const ReportsScreen = () => {
             headers = ['Group Name', 'Count', 'Total Qty', 'Total Amount', 'Total Profit'];
             rows = reportData.map(d => [d.name, d.count, d.qty.toFixed(2), d.amount.toFixed(2), d.profit.toFixed(2)]);
         } else {
-            headers = ['Date', 'Invoice', 'Party', 'Grain', 'Qty', 'Rate', 'Total'];
+            headers = ['Date', 'Invoice', 'Party', 'Grain', 'Bags', 'Qty', 'Rate', 'Gross(Q*R)', 'Shortage', 'Deduction', 'Labour', 'Transport', 'Net Realized'];
             if (reportType === 'profit') { headers.push('Avg Cost'); headers.push('Profit'); }
 
             rows = reportData.map(d => {
                 let r = [
                     new Date(d.date).toLocaleDateString().replace(/,/g, ''),
                     d.invoice_number || '-',
-                    `"${d.contactName}"`, // Quote for CSV safety
+                    `"${d.contactName}"`,
                     `"${d.grainName}"`,
+                    (d.number_of_bags || 0).toString(),
                     d.quantity_quintal.toFixed(2),
                     d.rate_per_quintal.toFixed(2),
-                    d.netAmount.toFixed(2)
+                    d.baseAmount.toFixed(2),
+                    d.shortageCost.toFixed(2),
+                    d.deductionCost.toFixed(2),
+                    d.labourCostTotal.toFixed(2),
+                    d.transportCostTotal.toFixed(2),
+                    d.netRealized.toFixed(2)
                 ];
                 if (reportType === 'profit') {
                     r.push((d.cost_price_per_quintal || 0).toFixed(2));
@@ -223,10 +250,20 @@ const ReportsScreen = () => {
         }
 
         const amount = parseFloat(paymentAmount);
-        const pending = selectedTrx.total_amount - (selectedTrx.amount_paid || 0);
+
+        // Calculate Net Pending
+        const shortageVal = (selectedTrx.shortage_quantity || 0) * selectedTrx.rate_per_quintal;
+        const deduction = selectedTrx.deduction_amount || 0;
+        const netTotal = selectedTrx.total_amount - shortageVal - deduction;
+        const pending = netTotal - (selectedTrx.amount_paid || 0);
 
         if (amount <= 0) {
             Alert.alert("Error", "Amount must be positive");
+            return;
+        }
+
+        if (amount > pending + 1.0) { // Small buffer for round off
+            Alert.alert("Error", `Cannot pay more than pending amount (₹${pending.toFixed(2)})`);
             return;
         }
 
@@ -245,9 +282,16 @@ const ReportsScreen = () => {
         }
     };
 
-    const getStatusParams = (paid, total) => {
+    const getStatusParams = (paid, total, type, shortage, deduction, rate) => {
+        let effectiveTotal = total;
+        if (type === 'sale') {
+            const shortageVal = (shortage || 0) * (rate || 0);
+            effectiveTotal = total - shortageVal - (deduction || 0);
+        }
+
         const p = paid || 0;
-        if (p >= total - 0.1) return { label: 'Fully Paid', color: 'bg-green-100 text-green-800' };
+        // If effectiveTotal is negative (loss/theft), and we paid 0, it's fully paid (settled).
+        if (p >= effectiveTotal - 1.0) return { label: 'Fully Paid', color: 'bg-green-100 text-green-800' };
         if (p > 0) return { label: 'Partial', color: 'bg-yellow-100 text-yellow-800' };
         return { label: 'Pending', color: 'bg-red-100 text-red-800' };
     };
@@ -260,8 +304,15 @@ const ReportsScreen = () => {
             // 2. Status Filter
             if (filterStatus !== 'all') {
                 const p = t.amount_paid || 0;
+                let effectiveTotal = t.total_amount;
+
+                if (t.type === 'sale') {
+                    const s = (t.shortage_quantity || 0) * (t.rate_per_quintal || 0);
+                    effectiveTotal = t.total_amount - s - (t.deduction_amount || 0);
+                }
+
                 let status = 'pending';
-                if (p >= t.total_amount - 0.1) status = 'paid';
+                if (p >= effectiveTotal - 1.0) status = 'paid';
                 else if (p > 0) status = 'partial';
 
                 // User might want "paid" to include "fully paid"
@@ -301,7 +352,15 @@ const ReportsScreen = () => {
         const isPurchase = item.type === 'purchase';
         const contactName = contacts[item.contact_id] || 'Unknown Contact';
         const grainName = grains[item.grain_id] || 'Unknown Grain';
-        const status = getStatusParams(item.amount_paid, item.total_amount);
+
+        const status = getStatusParams(
+            item.amount_paid,
+            item.total_amount,
+            item.type,
+            item.shortage_quantity,
+            item.deduction_amount,
+            item.rate_per_quintal
+        );
 
         return (
             <View className="bg-white p-4 rounded-xl mb-3 shadow-sm border border-gray-100">
@@ -329,7 +388,19 @@ const ReportsScreen = () => {
                             <Text className="text-brand-navy font-bold text-lg">{contactName}</Text>
                             <Text className="text-gray-500 text-sm">{grainName}</Text>
                         </View>
-                        <Text className="text-brand-navy font-bold text-lg">₹ {item.total_amount.toFixed(2)}</Text>
+                        <View className="items-end">
+                            <Text className="text-brand-navy font-bold text-lg text-right">₹ {item.total_amount.toFixed(2)}</Text>
+                            {/* Show Settled Amount if different */}
+                            {(item.type === 'sale' && (item.shortage_quantity > 0 || item.deduction_amount > 0)) && (() => {
+                                const shortageVal = (item.shortage_quantity || 0) * item.rate_per_quintal;
+                                const net = item.total_amount - shortageVal - (item.deduction_amount || 0);
+                                return (
+                                    <Text className="text-orange-600 font-bold text-xs text-right">
+                                        Settled: ₹ {net.toFixed(2)}
+                                    </Text>
+                                );
+                            })()}
+                        </View>
                     </View>
                     <View className="flex-row justify-between mb-2">
                         <Text className="text-gray-500">{item.quantity_quintal} Qtl @ ₹{item.rate_per_quintal}</Text>
@@ -522,8 +593,15 @@ const ReportsScreen = () => {
                                             <Text className="font-bold w-20 text-gray-700">Invoice</Text>
                                             <Text className="font-bold w-32 text-gray-700">Party</Text>
                                             <Text className="font-bold w-24 text-gray-700">Grain</Text>
-                                            <Text className="font-bold w-20 text-right text-gray-700">Qty</Text>
-                                            <Text className="font-bold w-20 text-right text-gray-700">Rate</Text>
+                                            <Text className="font-bold w-16 text-right text-gray-700">Bags</Text>
+                                            <Text className="font-bold w-16 text-right text-gray-700">Qty</Text>
+                                            <Text className="font-bold w-16 text-right text-gray-700">Rate</Text>
+                                            <Text className="font-bold w-20 text-right text-gray-700">Gross</Text>
+                                            <Text className="font-bold w-16 text-right text-gray-700">Short</Text>
+                                            <Text className="font-bold w-16 text-right text-gray-700">Ded.</Text>
+                                            <Text className="font-bold w-16 text-right text-gray-700">Lab.</Text>
+                                            <Text className="font-bold w-16 text-right text-gray-700">Trans.</Text>
+                                            <Text className="font-bold w-24 text-right text-brand-navy">Net</Text>
                                             {reportType === 'profit' && (
                                                 <>
                                                     <Text className="font-bold w-20 text-right text-gray-700">Avg Cost</Text>
@@ -551,8 +629,16 @@ const ReportsScreen = () => {
                                                 <Text className="w-20 text-xs">{d.invoice_number}</Text>
                                                 <Text className="w-32 text-xs" numberOfLines={1}>{d.contactName}</Text>
                                                 <Text className="w-24 text-xs">{d.grainName}</Text>
-                                                <Text className="w-20 text-right text-xs">{d.quantity_quintal.toFixed(2)}</Text>
-                                                <Text className="w-20 text-right text-xs">{d.rate_per_quintal.toFixed(0)}</Text>
+                                                <Text className="w-16 text-right text-xs">{(d.number_of_bags || 0)}</Text>
+                                                <Text className="w-16 text-right text-xs">{d.quantity_quintal.toFixed(2)}</Text>
+                                                <Text className="w-16 text-right text-xs">{d.rate_per_quintal.toFixed(0)}</Text>
+                                                <Text className="w-20 text-right text-xs font-semibold">{d.baseAmount.toFixed(0)}</Text>
+                                                <Text className="w-16 text-right text-xs text-red-400">{d.shortageCost > 0 ? d.shortageCost.toFixed(0) : '-'}</Text>
+                                                <Text className="w-16 text-right text-xs text-red-400">{d.deductionCost > 0 ? d.deductionCost.toFixed(0) : '-'}</Text>
+                                                <Text className="w-16 text-right text-xs text-gray-500">{d.labourCostTotal > 0 ? d.labourCostTotal.toFixed(0) : '-'}</Text>
+                                                <Text className="w-16 text-right text-xs text-gray-500">{d.transportCostTotal > 0 ? d.transportCostTotal.toFixed(0) : '-'}</Text>
+                                                <Text className="w-24 text-right text-xs font-bold text-brand-navy">{d.netRealized.toFixed(0)}</Text>
+
                                                 {reportType === 'profit' && (
                                                     <>
                                                         <Text className="w-20 text-right text-xs text-gray-500">{(d.cost_price_per_quintal || 0).toFixed(0)}</Text>

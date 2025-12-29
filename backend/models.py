@@ -54,6 +54,14 @@ class Transaction(SQLModel, table=True):
     deduction_amount: float = Field(default=0.0) # Monetary deduction (quality claim etc)
     deduction_note: Optional[str] = None
 
+    # New Cost fields (Purchase & Sale)
+    labour_cost_per_bag: float = Field(default=3.0) 
+    transport_cost_per_qtl: float = Field(default=0.0)
+    
+    # Store calculated totals
+    labour_cost_total: float = Field(default=0.0) # Used in Purchase to deduct
+    expenses_total: float = Field(default=0.0) # Sale: Labour + Transport (Hidden)
+
 class PaymentHistory(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     transaction_id: int = Field(foreign_key="transaction.id")

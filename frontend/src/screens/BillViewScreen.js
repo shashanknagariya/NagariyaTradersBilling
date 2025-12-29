@@ -300,6 +300,15 @@ const BillViewScreen = () => {
                             <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
                         </tr>
 
+                        ${isPurchase && (mainTrx.labour_cost_per_bag > 0) ? `
+                        <tr>
+                            <td colspan="4" class="text-right bold">Less: Labour / Palledari (@ ₹${mainTrx.labour_cost_per_bag}/bag)</td>
+                            <td class="text-right bold"></td>
+                            <td></td>
+                            <td class="text-right bold text-red">- ${(mainTrx.labour_cost_per_bag * mainTrx.number_of_bags).toFixed(2)}</td>
+                        </tr>
+                        ` : ''}
+
                         <!-- Total -->
                         <tr>
                             <td colspan="4" class="text-right bold">Sub Total (Taxable)</td>
@@ -383,14 +392,31 @@ const BillViewScreen = () => {
         if (!mainTrx) return;
         setSettlementLoading(true);
         try {
-            // Update Transaction with deduction details
-            await client.put(`/transactions/${mainTrx.id}`, {
-                shortage_quantity: parseFloat(shortageQty) || 0,
-                deduction_amount: parseFloat(deductionAmt) || 0,
+            const sImp = parseFloat(shortageQty) || 0;
+            const dImp = parseFloat(deductionAmt) || 0;
+
+            // 1. Update Settlement
+            const res = await client.put(`/transactions/${mainTrx.id}`, {
+                shortage_quantity: sImp,
+                deduction_amount: dImp,
                 deduction_note: deductionNote
             });
+
+            // 2. If "Mark Paid" selected, pay the balance
+            if (markAsPaid) {
+                // Calculate Net Balance using NEW values
+                const shortageVal = sImp * mainTrx.rate_per_quintal;
+                const netTotal = mainTrx.total_amount - shortageVal - dImp;
+                const pending = netTotal - (mainTrx.amount_paid || 0);
+
+                if (pending > 0) {
+                    await client.post(`/transactions/${mainTrx.id}/payment`, { amount: pending });
+                }
+            }
+
             Alert.alert("Success", "Settlement Updated");
             setSettlementModalVisible(false);
+            setMarkAsPaid(false);
             fetchData();
         } catch (e) {
             console.error(e);
@@ -399,6 +425,9 @@ const BillViewScreen = () => {
             setSettlementLoading(false);
         }
     };
+
+    // ...
+    const [markAsPaid, setMarkAsPaid] = useState(false);
 
     const [settlementModalVisible, setSettlementModalVisible] = useState(false);
     const [shortageQty, setShortageQty] = useState('0');
@@ -435,7 +464,7 @@ const BillViewScreen = () => {
 
             <ScrollView className="flex-1">
                 {/* Settlement Card - Sale Only */}
-                {type === 'sale' && (
+                {mainTrx.type === 'sale' && (
                     <View className="mx-4 mt-4 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
                         <View className="flex-row justify-between items-center mb-2">
                             <Text className="font-bold text-lg text-brand-navy">Settlement & Final Amount</Text>
@@ -547,6 +576,16 @@ const BillViewScreen = () => {
                             onChangeText={setDeductionNote}
                             placeholder="e.g. Quality Cut"
                         />
+
+                        <TouchableOpacity
+                            className="flex-row items-center mb-6"
+                            onPress={() => setMarkAsPaid(!markAsPaid)}
+                        >
+                            <View className={`w-6 h-6 rounded border ${markAsPaid ? 'bg-brand-navy border-brand-navy' : 'border-gray-400'} mr-3 justify-center items-center`}>
+                                {markAsPaid && <Text className="text-white font-bold">✓</Text>}
+                            </View>
+                            <Text className="text-gray-700 font-bold">Close Bill (Mark Remaining as Paid)</Text>
+                        </TouchableOpacity>
 
                         <View className="flex-row justify-end space-x-4">
                             <TouchableOpacity onPress={() => setSettlementModalVisible(false)} className="p-3">

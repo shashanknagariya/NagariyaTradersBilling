@@ -18,6 +18,7 @@ const PurchaseScreen = () => {
     const [numBags, setNumBags] = useState('');
     const [bharti, setBharti] = useState('60');
     const [rate, setRate] = useState('');
+    const [labourCost, setLabourCost] = useState('3'); // Default 3.0
 
     // New Entry Inputs
     const [newContactName, setNewContactName] = useState('');
@@ -70,10 +71,15 @@ const PurchaseScreen = () => {
         const bags = parseFloat(numBags) || 0;
         const kgsPerBag = parseFloat(bharti) || 0;
         const ratePerQ = parseFloat(rate) || 0;
+        const lRate = parseFloat(labourCost) || 0;
 
         const totalKg = bags * kgsPerBag;
         const totalQ = totalKg / 100;
-        const amount = totalQ * ratePerQ;
+
+        // Final Amount = (Weight * Rate) - (Labour * Bags)
+        const grainValue = totalQ * ratePerQ;
+        const labourDeduction = bags * lRate;
+        const amount = grainValue - labourDeduction;
 
         setTotalWeightKg(totalKg.toFixed(2));
         setTotalWeightQtl(totalQ.toFixed(2));
@@ -164,9 +170,17 @@ const PurchaseScreen = () => {
                 rate_per_quintal: parseFloat(rate),
                 total_amount: parseFloat(totalPrice),
                 payment_status: 'pending',
-                notes: `${numBags} Bags @ ${bharti}kg. Total ${totalWeightKg} Kg`
+                notes: `${numBags} Bags @ ${bharti}kg. Total ${totalWeightKg} Kg`,
+                labour_cost_per_bag: parseFloat(labourCost) || 0
             });
-            Alert.alert("Success", "Purchase Recorded!");
+            if (Platform.OS === 'web') {
+                alert("Success: Purchase Recorded!");
+                navigation.navigate('Home');
+            } else {
+                Alert.alert("Success", "Purchase Recorded!", [
+                    { text: "OK", onPress: () => navigation.navigate('Home') }
+                ]);
+            }
             setNumBags('');
             setRate('');
         } catch (e) {
@@ -259,6 +273,15 @@ const PurchaseScreen = () => {
                             placeholder="0.00"
                             value={rate}
                             onChangeText={setRate}
+                        />
+
+                        <Text className="text-brand-navy font-bold mb-2 ml-1">Labour Cost / Bag (Palledari)</Text>
+                        <TextInput
+                            className={`bg-gray-50 p-4 rounded-xl mb-6 text-xl border border-gray-200 focus:border-brand-gold ${Platform.OS === 'web' ? 'outline-none' : ''}`}
+                            keyboardType="numeric"
+                            placeholder="3.00"
+                            value={labourCost}
+                            onChangeText={setLabourCost}
                         />
 
                         <View className="bg-brand-navy p-5 rounded-xl mb-6 shadow-lg">

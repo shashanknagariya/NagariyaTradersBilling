@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from database import get_session
 from models import Transaction, PaymentHistory
@@ -11,7 +11,20 @@ router = APIRouter(prefix="/transactions", tags=["transactions"])
 def create_transaction(transaction: Transaction, session: Session = Depends(get_session)):
     # Calculate total if not provided
     if transaction.total_amount == 0 and transaction.quantity_quintal > 0 and transaction.rate_per_quintal > 0:
-        transaction.total_amount = transaction.quantity_quintal * transaction.rate_per_quintal
+        raw_total = transaction.quantity_quintal * transaction.rate_per_quintal
+        
+        if transaction.type == 'purchase':
+             # Purchase: Deduct Labour Cost (Palledari)
+             # Use provided labour cost or default 3.0
+             l_rate = transaction.labour_cost_per_bag if transaction.labour_cost_per_bag > 0 else 3.0
+             labour = (transaction.number_of_bags or 0) * l_rate
+             transaction.labour_cost_total = labour
+             transaction.total_amount = raw_total - labour
+             transaction.labour_cost_per_bag = l_rate 
+        else:
+             # Regular Sale (Non-Bulk) - rarely used but good to have
+             transaction.total_amount = raw_total
+             # (Expenses logic omitted for single sale as UI primarily uses Bulk)
 
     # Auto Increment Invoice Number
     max_inv = session.exec(select(func.max(Transaction.invoice_number)).where(Transaction.type == transaction.type)).first()
@@ -40,6 +53,8 @@ class BulkSaleCreate(BaseModel):
     vehicle_number: str | None = None
     warehouses: List[WarehouseAllocation]
     tax_percentage: float = 0.0
+    labour_cost_per_bag: float = 3.0
+    transport_cost_per_qtl: float = 0.0
 
 @router.post("/bulk_sale", response_model=List[Transaction])
 def create_bulk_sale(sale_data: BulkSaleCreate, session: Session = Depends(get_session)):
@@ -59,6 +74,40 @@ def create_bulk_sale(sale_data: BulkSaleCreate, session: Session = Depends(get_s
 
     for alloc in sale_data.warehouses:
         qty_quintal = (alloc.bags * sale_data.bharti) / 100.0
+        
+        # VALIDATION: Check Stock
+        # Calculate available stock for this Grain + Warehouse
+        p_qty = session.exec(select(func.sum(Transaction.quantity_quintal)).where(
+            Transaction.type == "purchase", 
+            Transaction.grain_id == sale_data.grain_id, 
+            Transaction.warehouse_id == alloc.warehouse_id
+        )).first() or 0.0
+        
+        s_qty = session.exec(select(func.sum(Transaction.quantity_quintal)).where(
+            Transaction.type == "sale", 
+            Transaction.grain_id == sale_data.grain_id, 
+            Transaction.warehouse_id == alloc.warehouse_id
+        )).first() or 0.0
+        
+        available_stock = p_qty - s_qty
+        
+        if qty_quintal > available_stock:
+             # Fetch warehouse name for better error
+             from models import Warehouse
+             wh_name = session.get(Warehouse, alloc.warehouse_id).name
+             raise HTTPException(
+                 status_code=400, 
+                 detail=f"Insufficient stock in {wh_name}. Available: {available_stock:.2f} Qtl, Requested: {qty_quintal:.2f} Qtl"
+             )
+
+        # Cost Calculations
+        labour_total = alloc.bags * sale_data.labour_cost_per_bag
+        transport_total = qty_quintal * sale_data.transport_cost_per_qtl
+        
+        # NOTE: For SALE, we DO NOT deduct from Total Amount (Buyer pays full grain price).
+        # These are internal expenses reflected in profit.
+        expenses = labour_total + transport_total
+
         subtotal = qty_quintal * sale_data.rate_per_quintal
         tax_amt = subtotal * (sale_data.tax_percentage / 100.0)
         total_amt = subtotal + tax_amt
@@ -74,6 +123,11 @@ def create_bulk_sale(sale_data: BulkSaleCreate, session: Session = Depends(get_s
             rate_per_quintal=sale_data.rate_per_quintal,
             total_amount=total_amt,
             tax_percentage=sale_data.tax_percentage,
+            
+            # Record Costs
+            labour_cost_per_bag=sale_data.labour_cost_per_bag,
+            transport_cost_per_qtl=sale_data.transport_cost_per_qtl,
+            expenses_total=expenses,
             cost_price_per_quintal=avg_cost,
             payment_status="pending",
             invoice_number=next_inv, # Assign same invoice number
@@ -136,13 +190,32 @@ def update_payment(transaction_id: int, payment: PaymentUpdate, session: Session
         transaction_id=transaction.id,
         amount=payment.amount
     )
+
+    # Calculate Net Total (Post Deductions)
+    shortage_val = (transaction.shortage_quantity or 0) * transaction.rate_per_quintal
+    deduction = transaction.deduction_amount or 0
+    net_total = transaction.total_amount - shortage_val - deduction
+    
+    current_pending = net_total - transaction.amount_paid
+    
+    # Validation: Prevent Overpayment
+    # Allow small float buffer (1.0)
+    if payment.amount > current_pending + 1.0:
+        raise HTTPException(status_code=400, detail=f"Cannot accept ₹{payment.amount}. Max receivable is ₹{current_pending:.2f}")
+
     session.add(history)
 
     # Update Transaction Total
     transaction.amount_paid += payment.amount
     
     # Update Status
-    if transaction.amount_paid >= transaction.total_amount:
+    # Calculate Net Amount (Post Deductions)
+    shortage_val = (transaction.shortage_quantity or 0) * transaction.rate_per_quintal
+    deduction = transaction.deduction_amount or 0
+    net_total = transaction.total_amount - shortage_val - deduction
+    
+    # Use a small epsilon for float comparison
+    if transaction.amount_paid >= net_total - 1.0:
         transaction.payment_status = "paid"
     elif transaction.amount_paid > 0:
         transaction.payment_status = "partial"
@@ -177,6 +250,9 @@ class TransactionUpdate(BaseModel):
     destination: Optional[str] = None
     transporter_name: Optional[str] = None
     notes: Optional[str] = None
+    shortage_quantity: Optional[float] = None
+    deduction_amount: Optional[float] = None
+    deduction_note: Optional[str] = None
 
 @router.put("/{transaction_id}", response_model=Transaction)
 def update_transaction(transaction_id: int, updates: TransactionUpdate, session: Session = Depends(get_session)):
@@ -187,6 +263,18 @@ def update_transaction(transaction_id: int, updates: TransactionUpdate, session:
     update_data = updates.dict(exclude_unset=True)
     for key, value in update_data.items():
         setattr(transaction, key, value)
+    
+    # Re-calculate Payment Status if amounts changed
+    shortage_val = (transaction.shortage_quantity or 0) * transaction.rate_per_quintal
+    deduction = transaction.deduction_amount or 0
+    net_total = transaction.total_amount - shortage_val - deduction
+    
+    if transaction.amount_paid >= net_total - 1.0:
+        transaction.payment_status = "paid"
+    elif transaction.amount_paid > 0:
+        transaction.payment_status = "partial"
+    else:
+        transaction.payment_status = "pending"
         
     session.add(transaction)
     session.commit()

@@ -24,6 +24,10 @@ const SalesScreen = () => {
     const [rate, setRate] = useState('');
     const [gstRate, setGstRate] = useState('0');
 
+    // Costs
+    const [labourCost, setLabourCost] = useState('3');
+    const [transportCost, setTransportCost] = useState('0');
+
     // Transport Details
     const [transporter, setTransporter] = useState('');
     const [vehicleNo, setVehicleNo] = useState('');
@@ -108,6 +112,8 @@ const SalesScreen = () => {
             rate_per_quintal: parseFloat(rate),
             bharti: parseFloat(bharti),
             tax_percentage: parseFloat(gstRate) || 0,
+            labour_cost_per_bag: parseFloat(labourCost),
+            transport_cost_per_qtl: parseFloat(transportCost),
             transporter_name: transporter,
             destination: destination,
             driver_name: driverName,
@@ -117,7 +123,14 @@ const SalesScreen = () => {
 
         try {
             await client.post('/transactions/bulk_sale', payload);
-            Alert.alert("Success", "Bill Generated Successfully!");
+            if (Platform.OS === 'web') {
+                alert("Success: Bill Generated Successfully!");
+                navigation.navigate('Home');
+            } else {
+                Alert.alert("Success", "Bill Generated Successfully!", [
+                    { text: "OK", onPress: () => navigation.navigate('Home') }
+                ]);
+            }
             // Reset
             setAllocations({});
             setRate('');
@@ -127,7 +140,8 @@ const SalesScreen = () => {
             setDestination('');
         } catch (e) {
             console.error(e);
-            Alert.alert("Error", "Failed to generate bill");
+            const msg = e.response?.data?.detail || "Failed to generate bill";
+            Alert.alert("Error", msg);
         }
     };
 
@@ -248,6 +262,17 @@ const SalesScreen = () => {
                     <View className="flex-row justify-between items-center">
                         <Text className="text-brand-gold font-bold text-lg">Grand Total</Text>
                         <Text className="text-brand-gold font-bold text-2xl">₹ {grandTotal.toFixed(2)}</Text>
+                    </View>
+                </View>
+
+                {/* 5.5 Hidden Costs (Internal) */}
+                <Text className="text-xl font-bold text-gray-400 mb-4 border-b border-gray-100 pb-2 mt-4">Internal Costs (Profit calc)</Text>
+                <View className="flex-row justify-between">
+                    <View className="w-[48%]">
+                        <LabeledInput label="Labour / Bag" value={labourCost} onChange={setLabourCost} keyboardType="numeric" placeholder="3.00" />
+                    </View>
+                    <View className="w-[48%]">
+                        <LabeledInput label="Transport / Qtl" value={transportCost} onChange={setTransportCost} keyboardType="numeric" placeholder="0.00" />
                     </View>
                 </View>
 

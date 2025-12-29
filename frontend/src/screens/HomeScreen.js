@@ -20,8 +20,8 @@ const HomeScreen = () => {
 
     useFocusEffect(
         React.useCallback(() => {
-            fetchStats();
-        }, [])
+            if (isAdmin) fetchStats();
+        }, [isAdmin])
     );
 
     const fetchStats = async () => {
@@ -55,15 +55,17 @@ const HomeScreen = () => {
             </View>
 
             <View className="px-6 pb-6">
-                {/* Stats Row - Show only if allowed, or maybe always show? Let's show always for now or restrict? 
-                    User didn't specify, but usually workers see stats. keeping it. 
-                */}
-                <Text className="font-bold text-gray-700 mb-3 uppercase tracking-widest text-xs">Financial Overview</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-6 -mx-2">
-                    <StatCard label="To Receive" value={`₹ ${(stats.total_receivable || 0).toFixed(2)}`} color="bg-emerald-500" />
-                    <StatCard label="To Pay" value={`₹ ${(stats.total_payable || 0).toFixed(2)}`} color="bg-rose-500" />
-                    <StatCard label="Inventory Value" value={`₹ ${(stats.total_inventory_value || 0).toFixed(2)}`} color="bg-indigo-500" />
-                </ScrollView>
+                {/* Stats Row - Admin Only */}
+                {isAdmin && (
+                    <>
+                        <Text className="font-bold text-gray-700 mb-3 uppercase tracking-widest text-xs">Financial Overview</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-6 -mx-2">
+                            <StatCard label="To Receive" value={`₹ ${(stats.total_receivable || 0).toFixed(2)}`} color="bg-emerald-500" />
+                            <StatCard label="To Pay" value={`₹ ${(stats.total_payable || 0).toFixed(2)}`} color="bg-rose-500" />
+                            <StatCard label="Inventory Value" value={`₹ ${(stats.total_inventory_value || 0).toFixed(2)}`} color="bg-indigo-500" />
+                        </ScrollView>
+                    </>
+                )}
 
                 {/* Modules Grid */}
                 <Text className="font-bold text-gray-700 mb-3 uppercase tracking-widest text-xs">Quick Actions</Text>
