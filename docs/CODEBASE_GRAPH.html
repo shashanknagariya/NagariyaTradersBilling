@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Codebase Knowledge Graph</title>
+  <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      background: #0f172a;
+      color: #e2e8f0;
+    }
+
+    #header {
+      background: #1e293b;
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #334155;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 16px;
+      color: #f8fafc;
+    }
+
+    .controls {
+      display: flex;
+      gap: 8px;
+    }
+
+    button {
+      padding: 6px 14px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 12px;
+    }
+
+    button.active {
+      background: #3b82f6;
+      color: white;
+    }
+
+    button:not(.active) {
+      background: #334155;
+      color: #94a3b8;
+    }
+
+    #back-btn {
+      background: #475569;
+      color: white;
+      display: none;
+      margin-right: 12px;
+    }
+
+    #breadcrumb {
+      font-size: 12px;
+      color: #94a3b8;
+      margin-left: 15px;
+    }
+
+    #breadcrumb span {
+      color: #60a5fa;
+      font-weight: 600;
+    }
+
+    #graph-container {
+      width: 100vw;
+      height: calc(100vh - 50px);
+    }
+
+    .legend {
+      position: fixed;
+      bottom: 15px;
+      left: 15px;
+      background: rgba(30, 41, 59, 0.95);
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid #334155;
+      font-size: 11px;
+    }
+
+    .legend-title {
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #64748b;
+      margin-bottom: 8px;
+      font-weight: 600;
+      font-size: 10px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 5px;
+      color: #cbd5e1;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+
+    .info {
+      position: fixed;
+      top: 60px;
+      right: 15px;
+      background: rgba(30, 41, 59, 0.9);
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid #334155;
+      font-size: 11px;
+      color: #94a3b8;
+      max-width: 200px;
+    }
+
+    .info strong {
+      color: #f8fafc;
+    }
+
+    #tooltip {
+      position: fixed;
+      background: #1e293b;
+      border: 1px solid #475569;
+      border-radius: 8px;
+      padding: 12px 15px;
+      max-width: 320px;
+      font-size: 12px;
+      color: #e2e8f0;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+      z-index: 1000;
+      display: none;
+      pointer-events: none;
+    }
+
+    .tt-title {
+      font-weight: 700;
+      color: #f8fafc;
+      margin-bottom: 8px;
+      font-size: 13px;
+      border-bottom: 1px solid #334155;
+      padding-bottom: 6px;
+    }
+
+    .tt-item {
+      margin-left: 8px;
+      color: #cbd5e1;
+      margin-bottom: 3px;
+    }
+
+    .tt-drill {
+      color: #fbbf24;
+      font-weight: 600;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="header">
+    <div style="display:flex;align-items:center;">
+      <button id="back-btn" onclick="goBack()">← Back</button>
+      <h1>Codebase Knowledge Graph</h1>
+      <div id="breadcrumb"></div>
+    </div>
+    <div class="controls">
+      <button id="btn-frontend" class="active" onclick="switchView('frontend')">Frontend</button>
+      <button id="btn-backend" onclick="switchView('backend')">Backend</button>
+    </div>
+  </div>
+  <div id="graph-container"></div>
+  <div class="legend" id="legend"></div>
+  <div class="info"><strong>💡 Tips:</strong><br>• Click nodes to drill down<br>• Hover for details<br>• ← Back to go up
+  </div>
+  <div id="tooltip"></div>
+
+  <script>
+    const container = document.getElementById('graph-container');
+    const tooltipEl = document.getElementById('tooltip');
+    let currentView = 'frontend';
+    let navStack = [];
+    let navKeys = [];
+    let network = null;
+    let mouseX = 0, mouseY = 0;
+
+    // Track mouse position globally
+    document.addEventListener('mousemove', (e) => { mouseX = e.clientX; mouseY = e.clientY; });
+
+    const graphData = {
+      frontend: {
+        root: {
+          nodes: [
+            { id: 'App', label: 'App.js', group: 'router', shape: 'hexagon', info: { title: 'Root Entry Point', items: ['AuthProvider wrapper', 'NavigationContainer', 'Stack.Navigator'] } },
+            { id: 'AuthContext', label: 'AuthContext', group: 'logic', info: { title: 'State Management', items: ['userToken (JWT)', 'userInfo object', 'login() / logout()'] } },
+            { id: 'APIClient', label: 'API Client', group: 'logic', info: { title: 'HTTP Client (axios)', items: ['Base URL config', 'Token interceptor', '401 error handling'] } },
+            { id: 'Login', label: 'LoginScreen', group: 'screen', hasChildren: true, info: { title: 'Login Page', items: ['Username/Password inputs', 'POST /auth/login'], drill: '🔍 Click to explore' } },
+            { id: 'Home', label: 'HomeScreen', group: 'screen', hasChildren: true, info: { title: 'Dashboard', items: ['Stats cards (Admin)', 'Module navigation'], drill: '🔍 Click to explore' } },
+            { id: 'Purchase', label: 'PurchaseScreen', group: 'screen', hasChildren: true, info: { title: 'Purchase Form', items: ['Grain/Contact/Warehouse select', 'Calculation logic', 'POST /transactions/'], drill: '🔍 Click to explore' } },
+            { id: 'Sales', label: 'SalesScreen', group: 'screen', hasChildren: true, info: { title: 'Bulk Sale Form', items: ['Multi-warehouse selection', 'Stock validation', 'POST /bulk_sale'], drill: '🔍 Click to explore' } },
+            { id: 'Inventory', label: 'InventoryScreen', group: 'screen', info: { title: 'Inventory View', items: ['Grain-wise stock', 'Warehouse breakdown'] } },
+            { id: 'Reports', label: 'ReportsScreen', group: 'screen', hasChildren: true, info: { title: 'Reports & Analytics', items: ['Transaction list', 'CSV export', 'Payment modal'], drill: '🔍 Click to explore' } },
+            { id: 'BillView', label: 'BillViewScreen', group: 'screen', hasChildren: true, info: { title: 'Bill Preview', items: ['HTML generation', 'PDF print/share'], drill: '🔍 Click to explore' } },
+            { id: 'EditTrx', label: 'EditTransaction', group: 'screen', info: { title: 'Edit Transaction', items: ['Update fields', 'PUT /transactions/{id}'] } },
+            { id: 'UserMgmt', label: 'UserManagement', group: 'screen', info: { title: 'Admin Panel', items: ['User CRUD', 'Role management'] } },
+          ],
+          edges: [
+            { from: 'App', to: 'AuthContext', arrows: 'to', label: 'provides' },
+            { from: 'App', to: 'Login', arrows: 'to', label: 'initial' },
+            { from: 'Login', to: 'Home', arrows: 'to', label: 'success' },
+            { from: 'Home', to: 'Purchase', arrows: 'to' },
+            { from: 'Home', to: 'Sales', arrows: 'to' },
+            { from: 'Home', to: 'Inventory', arrows: 'to' },
+            { from: 'Home', to: 'Reports', arrows: 'to' },
+            { from: 'Home', to: 'UserMgmt', arrows: 'to', color: { color: '#f87171' }, label: 'admin' },
+            { from: 'Reports', to: 'BillView', arrows: 'to', label: 'view' },
+            { from: 'Reports', to: 'EditTrx', arrows: 'to', label: 'edit' },
+          ]
+        },
+        Login: {
+          nodes: [
+            { id: 'Login_main', label: 'LoginScreen()', group: 'function', hasChildren: true, info: { title: 'Main Component', items: ['State: username, password, loading'], drill: '🔍 Click for flow' } },
+            { id: 'Login_handleLogin', label: 'handleLogin()', group: 'function', hasChildren: true, info: { title: 'Login Handler', items: ['POST /auth/login', 'Stores token on success'], drill: '🔍 Click for flow' } },
+          ],
+          edges: [{ from: 'Login_main', to: 'Login_handleLogin', arrows: 'to', label: 'onPress' }]
+        },
+        Login_handleLogin: {
+          nodes: [
+            { id: 'LH_start', label: 'User Presses Login', group: 'step', shape: 'diamond', info: { title: 'Trigger', items: ['Button onPress event'] } },
+            { id: 'LH_validate', label: 'Validate Inputs', group: 'step', info: { title: 'Check', items: ['Username not empty', 'Password not empty'] } },
+            { id: 'LH_loading', label: 'Set Loading = true', group: 'step', info: { title: 'UI State', items: ['Show spinner', 'Disable button'] } },
+            { id: 'LH_api', label: 'POST /auth/login', group: 'step', info: { title: 'API Call', items: ['Form: username, password', 'Returns: token, user'] } },
+            { id: 'LH_fail', label: 'Show Error Alert', group: 'error', info: { title: 'Error Case', items: ['Invalid credentials', 'Network error'] } },
+            { id: 'LH_store', label: 'Store Token', group: 'step', info: { title: 'AuthContext', items: ['login(token, user)', 'AsyncStorage.setItem'] } },
+            { id: 'LH_nav', label: 'Navigate to Home', group: 'success', shape: 'diamond', info: { title: 'Success', items: ['Auto-navigation via AuthContext'] } },
+          ],
+          edges: [
+            { from: 'LH_start', to: 'LH_validate', arrows: 'to' },
+            { from: 'LH_validate', to: 'LH_loading', arrows: 'to' },
+            { from: 'LH_loading', to: 'LH_api', arrows: 'to' },
+            { from: 'LH_api', to: 'LH_fail', arrows: 'to', label: 'error', color: { color: '#f87171' } },
+            { from: 'LH_api', to: 'LH_store', arrows: 'to', label: 'success' },
+            { from: 'LH_store', to: 'LH_nav', arrows: 'to' },
+          ]
+        },
+        Home: {
+          nodes: [
+            { id: 'Home_main', label: 'HomeScreen()', group: 'function', info: { title: 'Main Component', items: ['State: stats, loading', 'Uses: useAuth, useNavigation'] } },
+            { id: 'Home_hasAccess', label: 'hasAccess(perm)', group: 'function', info: { title: 'Permission Check', items: ['Param: perm (string)', 'Returns: boolean', 'Logic: isAdmin || perms.includes(perm)'] } },
+            { id: 'Home_fetchStats', label: 'fetchStats()', group: 'function', hasChildren: true, info: { title: 'API Call', items: ['GET /stats/dashboard'], drill: '🔍 Click for flow' } },
+            { id: 'Home_handleLogout', label: 'handleLogout()', group: 'function', info: { title: 'Logout Handler', items: ['Shows Alert', 'Calls logout()'] } },
+            { id: 'Home_StatCard', label: 'StatCard', group: 'component', info: { title: 'UI Component', items: ['Props: label, value, color'] } },
+            { id: 'Home_ModuleCard', label: 'ModuleCard', group: 'component', info: { title: 'UI Component', items: ['Props: title, icon, onPress'] } },
+          ],
+          edges: [
+            { from: 'Home_main', to: 'Home_hasAccess', arrows: 'to', label: 'calls' },
+            { from: 'Home_main', to: 'Home_fetchStats', arrows: 'to', label: 'useFocusEffect' },
+            { from: 'Home_main', to: 'Home_handleLogout', arrows: 'to' },
+            { from: 'Home_main', to: 'Home_StatCard', arrows: 'to', label: 'renders' },
+            { from: 'Home_main', to: 'Home_ModuleCard', arrows: 'to', label: 'renders' },
+          ]
+        },
+        Home_fetchStats: {
+          nodes: [
+            { id: 'HF_start', label: 'useFocusEffect', group: 'step', shape: 'diamond', info: { title: 'Trigger', items: ['Screen comes into focus'] } },
+            { id: 'HF_check', label: 'Check isAdmin', group: 'step', info: { title: 'Condition', items: ['Only fetch if admin'] } },
+            { id: 'HF_api', label: 'GET /stats/dashboard', group: 'step', info: { title: 'API Call', items: ['Returns: receivable, payable, inventory'] } },
+            { id: 'HF_set', label: 'setStats(data)', group: 'step', info: { title: 'Update State', items: ['Updates stats object'] } },
+            { id: 'HF_loading', label: 'setLoading(false)', group: 'success', shape: 'diamond', info: { title: 'Complete', items: ['Hide spinner'] } },
+          ],
+          edges: [
+            { from: 'HF_start', to: 'HF_check', arrows: 'to' },
+            { from: 'HF_check', to: 'HF_api', arrows: 'to', label: 'isAdmin' },
+            { from: 'HF_api', to: 'HF_set', arrows: 'to' },
+            { from: 'HF_set', to: 'HF_loading', arrows: 'to' },
+          ]
+        },
+        Purchase: {
+          nodes: [
+            { id: 'Pur_main', label: 'PurchaseScreen()', group: 'function', info: { title: 'Main Component', items: ['State: grains, contacts, warehouses', 'numBags, bharti, rate, labourCost'] } },
+            { id: 'Pur_fetchMaster', label: 'fetchMasterData()', group: 'function', info: { title: 'API Calls', items: ['GET /master/grains', 'GET /master/contacts', 'GET /master/warehouses'] } },
+            { id: 'Pur_calcTotals', label: 'calculateTotals()', group: 'function', hasChildren: true, info: { title: 'Calculation', items: ['Computes weight, amount, labour'], drill: '🔍 Click for flow' } },
+            { id: 'Pur_handlePurchase', label: 'handlePurchase()', group: 'function', hasChildren: true, info: { title: 'Submit Handler', items: ['POST /transactions/'], drill: '🔍 Click for flow' } },
+            { id: 'Pur_createContact', label: 'handleCreateContact()', group: 'function', info: { title: 'Create Supplier', items: ['POST /master/contacts'] } },
+            { id: 'Pur_Dropdown', label: 'Dropdown', group: 'component', info: { title: 'Reusable Component', items: ['Props: label, value, onPress'] } },
+          ],
+          edges: [
+            { from: 'Pur_main', to: 'Pur_fetchMaster', arrows: 'to', label: 'useEffect' },
+            { from: 'Pur_main', to: 'Pur_calcTotals', arrows: 'to', label: 'useMemo' },
+            { from: 'Pur_main', to: 'Pur_handlePurchase', arrows: 'to', label: 'onPress' },
+            { from: 'Pur_main', to: 'Pur_createContact', arrows: 'to' },
+            { from: 'Pur_main', to: 'Pur_Dropdown', arrows: 'to', label: 'renders' },
+          ]
+        },
+        Pur_calcTotals: {
+          nodes: [
+            { id: 'PC_start', label: 'useMemo Trigger', group: 'step', shape: 'diamond', info: { title: 'Deps', items: ['numBags, bharti, rate, labourCost'] } },
+            { id: 'PC_kg', label: 'Calculate Weight (kg)', group: 'step', info: { title: 'Formula', items: ['totalWeightKg = bags × bharti'] } },
+            { id: 'PC_qtl', label: 'Convert to Quintal', group: 'step', info: { title: 'Formula', items: ['totalWeightQtl = kg / 100'] } },
+            { id: 'PC_raw', label: 'Calculate Raw Amount', group: 'step', info: { title: 'Formula', items: ['rawAmount = qtl × rate'] } },
+            { id: 'PC_labour', label: 'Calculate Labour Cost', group: 'step', info: { title: 'Formula', items: ['labourTotal = bags × labourCost'] } },
+            { id: 'PC_final', label: 'Calculate Final Total', group: 'success', shape: 'diamond', info: { title: 'Formula', items: ['totalPrice = rawAmount - labourTotal'] } },
+          ],
+          edges: [
+            { from: 'PC_start', to: 'PC_kg', arrows: 'to' },
+            { from: 'PC_kg', to: 'PC_qtl', arrows: 'to' },
+            { from: 'PC_qtl', to: 'PC_raw', arrows: 'to' },
+            { from: 'PC_raw', to: 'PC_labour', arrows: 'to' },
+            { from: 'PC_labour', to: 'PC_final', arrows: 'to' },
+          ]
+        },
+        Pur_handlePurchase: {
+          nodes: [
+            { id: 'PH_start', label: 'Submit Button Press', group: 'step', shape: 'diamond', info: { title: 'Trigger', items: ['onPress event'] } },
+            { id: 'PH_validate', label: 'Validate Fields', group: 'step', info: { title: 'Check', items: ['Grain selected', 'Contact selected', 'Warehouse selected', 'Values > 0'] } },
+            { id: 'PH_fail', label: 'Show Error', group: 'error', info: { title: 'Validation Failed', items: ['Alert: Please fill all fields'] } },
+            { id: 'PH_payload', label: 'Build Payload', group: 'step', info: { title: 'Object', items: ['type: purchase', 'grain_id, contact_id, warehouse_id', 'quantity_quintal, number_of_bags', 'rate_per_quintal, labour_cost_per_bag'] } },
+            { id: 'PH_api', label: 'POST /transactions/', group: 'step', info: { title: 'API Call', items: ['Send payload', 'Wait for response'] } },
+            { id: 'PH_error', label: 'Show API Error', group: 'error', info: { title: 'API Error', items: ['Display error message'] } },
+            { id: 'PH_success', label: 'Show Success Alert', group: 'step', info: { title: 'Success', items: ['Alert: Purchase recorded'] } },
+            { id: 'PH_nav', label: 'Navigate to Home', group: 'success', shape: 'diamond', info: { title: 'Complete', items: ['navigation.navigate("Home")'] } },
+          ],
+          edges: [
+            { from: 'PH_start', to: 'PH_validate', arrows: 'to' },
+            { from: 'PH_validate', to: 'PH_fail', arrows: 'to', label: 'invalid', color: { color: '#f87171' } },
+            { from: 'PH_validate', to: 'PH_payload', arrows: 'to', label: 'valid' },
+            { from: 'PH_payload', to: 'PH_api', arrows: 'to' },
+            { from: 'PH_api', to: 'PH_error', arrows: 'to', label: 'error', color: { color: '#f87171' } },
+            { from: 'PH_api', to: 'PH_success', arrows: 'to', label: 'success' },
+            { from: 'PH_success', to: 'PH_nav', arrows: 'to' },
+          ]
+        },
+        Sales: {
+          nodes: [
+            { id: 'Sale_main', label: 'SalesScreen()', group: 'function', info: { title: 'Main Component', items: ['State: buyers, grains, inventory', 'allocations, rate, bharti, costs'] } },
+            { id: 'Sale_fetchMaster', label: 'fetchMasterData()', group: 'function', info: { title: 'API Calls', items: ['GET /master/contacts (buyers)', 'GET /master/grains', 'GET /inventory/'] } },
+            { id: 'Sale_handleSale', label: 'handleSale()', group: 'function', hasChildren: true, info: { title: 'Submit Handler', items: ['POST /transactions/bulk_sale'], drill: '🔍 Click for flow' } },
+            { id: 'Sale_toggle', label: 'toggleAllocation()', group: 'function', info: { title: 'Warehouse Selection', items: ['Params: wId, bags', 'Updates allocations'] } },
+          ],
+          edges: [
+            { from: 'Sale_main', to: 'Sale_fetchMaster', arrows: 'to', label: 'useEffect' },
+            { from: 'Sale_main', to: 'Sale_handleSale', arrows: 'to', label: 'onPress' },
+            { from: 'Sale_main', to: 'Sale_toggle', arrows: 'to' },
+          ]
+        },
+        Sale_handleSale: {
+          nodes: [
+            { id: 'SH_start', label: 'Submit Button', group: 'step', shape: 'diamond', info: { title: 'Trigger', items: ['onPress event'] } },
+            { id: 'SH_validate', label: 'Validate', group: 'step', info: { title: 'Check', items: ['Buyer selected', 'Grain selected', 'Allocations not empty'] } },
+            { id: 'SH_payload', label: 'Build Payload', group: 'step', info: { title: 'BulkSaleCreate', items: ['contact_id, grain_id', 'rate_per_quintal, bharti', 'warehouses: [{warehouse_id, bags}]', 'labour_cost, transport_cost'] } },
+            { id: 'SH_api', label: 'POST /bulk_sale', group: 'step', info: { title: 'API Call', items: ['Backend validates stock', 'Creates transactions'] } },
+            { id: 'SH_error', label: 'Show Error', group: 'error', info: { title: 'Error', items: ['Insufficient stock', 'API error'] } },
+            { id: 'SH_success', label: 'Show Success', group: 'step', info: { title: 'Alert', items: ['Sale recorded successfully'] } },
+            { id: 'SH_nav', label: 'Navigate Home', group: 'success', shape: 'diamond', info: { title: 'Complete', items: ['navigation.navigate("Home")'] } },
+          ],
+          edges: [
+            { from: 'SH_start', to: 'SH_validate', arrows: 'to' },
+            { from: 'SH_validate', to: 'SH_payload', arrows: 'to' },
+            { from: 'SH_payload', to: 'SH_api', arrows: 'to' },
+            { from: 'SH_api', to: 'SH_error', arrows: 'to', label: 'error', color: { color: '#f87171' } },
+            { from: 'SH_api', to: 'SH_success', arrows: 'to', label: 'success' },
+            { from: 'SH_success', to: 'SH_nav', arrows: 'to' },
+          ]
+        },
+        Reports: {
+          nodes: [
+            { id: 'Rep_main', label: 'ReportsScreen()', group: 'function', info: { title: 'Main Component', items: ['State: transactions, filters', 'contacts, grains, warehouses'] } },
+            { id: 'Rep_fetchData', label: 'fetchData()', group: 'function', info: { title: 'API Calls', items: ['GET /transactions/', 'GET all master data'] } },
+            { id: 'Rep_reportData', label: 'reportData', group: 'logic', hasChildren: true, info: { title: 'useMemo', items: ['Filters, sorts, calculates'], drill: '🔍 Click for flow' } },
+            { id: 'Rep_downloadCsv', label: 'downloadCsv()', group: 'function', hasChildren: true, info: { title: 'CSV Export', items: ['Generate and share'], drill: '🔍 Click for flow' } },
+            { id: 'Rep_handlePayment', label: 'handlePaymentSubmit()', group: 'function', info: { title: 'Payment', items: ['POST /transactions/{id}/payment'] } },
+          ],
+          edges: [
+            { from: 'Rep_main', to: 'Rep_fetchData', arrows: 'to', label: 'useFocusEffect' },
+            { from: 'Rep_main', to: 'Rep_reportData', arrows: 'to' },
+            { from: 'Rep_main', to: 'Rep_downloadCsv', arrows: 'to' },
+            { from: 'Rep_main', to: 'Rep_handlePayment', arrows: 'to' },
+          ]
+        },
+        Rep_reportData: {
+          nodes: [
+            { id: 'RD_start', label: 'useMemo Trigger', group: 'step', shape: 'diamond', info: { title: 'Deps', items: ['transactions, filters, tab'] } },
+            { id: 'RD_filter', label: 'Filter Transactions', group: 'step', info: { title: 'Logic', items: ['By type (purchase/sale)', 'By date range', 'By grain/contact/warehouse'] } },
+            { id: 'RD_sort', label: 'Sort by Date', group: 'step', info: { title: 'Order', items: ['Descending (newest first)'] } },
+            { id: 'RD_calc', label: 'Calculate Amounts', group: 'step', info: { title: 'Per Transaction', items: ['baseAmount = qty × rate', 'shortageCost = shortage × rate', 'deductionCost', 'labourCostTotal = bags × labour', 'transportCostTotal = qty × transport', 'netRealized = base - all costs'] } },
+            { id: 'RD_profit', label: 'Calculate Profit', group: 'step', info: { title: 'Sales Only', items: ['profit = netRealized - (qty × costPrice) - expenses'] } },
+            { id: 'RD_return', label: 'Return Array', group: 'success', shape: 'diamond', info: { title: 'Output', items: ['Enriched transaction array'] } },
+          ],
+          edges: [
+            { from: 'RD_start', to: 'RD_filter', arrows: 'to' },
+            { from: 'RD_filter', to: 'RD_sort', arrows: 'to' },
+            { from: 'RD_sort', to: 'RD_calc', arrows: 'to' },
+            { from: 'RD_calc', to: 'RD_profit', arrows: 'to' },
+            { from: 'RD_profit', to: 'RD_return', arrows: 'to' },
+          ]
+        },
+        Rep_downloadCsv: {
+          nodes: [
+            { id: 'DC_start', label: 'Download Button', group: 'step', shape: 'diamond', info: { title: 'Trigger', items: ['onPress event'] } },
+            { id: 'DC_headers', label: 'Build Headers', group: 'step', info: { title: 'CSV Headers', items: ['Date, Type, Party, Grain', 'Warehouse, Bags, Qty, Rate', 'Gross, Shortage, Deduction', 'Labour, Transport, Net, Profit'] } },
+            { id: 'DC_rows', label: 'Build Rows', group: 'step', info: { title: 'Map reportData', items: ['Convert each item to CSV row'] } },
+            { id: 'DC_content', label: 'Join Content', group: 'step', info: { title: 'Build String', items: ['headers + newline + rows'] } },
+            { id: 'DC_save', label: 'Save File', group: 'step', info: { title: 'expo-file-system', items: ['FileSystem.writeAsStringAsync'] } },
+            { id: 'DC_share', label: 'Share File', group: 'success', shape: 'diamond', info: { title: 'expo-sharing', items: ['Sharing.shareAsync(uri)'] } },
+          ],
+          edges: [
+            { from: 'DC_start', to: 'DC_headers', arrows: 'to' },
+            { from: 'DC_headers', to: 'DC_rows', arrows: 'to' },
+            { from: 'DC_rows', to: 'DC_content', arrows: 'to' },
+            { from: 'DC_content', to: 'DC_save', arrows: 'to' },
+            { from: 'DC_save', to: 'DC_share', arrows: 'to' },
+          ]
+        },
+        BillView: {
+          nodes: [
+            { id: 'BV_main', label: 'BillViewScreen()', group: 'function', info: { title: 'Main Component', items: ['Params: transactionId', 'State: transactions, loading'] } },
+            { id: 'BV_fetch', label: 'fetchBill()', group: 'function', info: { title: 'API Call', items: ['GET /transactions/bill/{id}', 'Returns grouped transactions'] } },
+            { id: 'BV_genHtml', label: 'generateHtml()', group: 'function', hasChildren: true, info: { title: 'HTML Generation', items: ['Builds bill HTML'], drill: '🔍 Click for flow' } },
+            { id: 'BV_print', label: 'handlePrint()', group: 'function', info: { title: 'Print/PDF', items: ['Print.printAsync', 'Or printToFile for PDF'] } },
+            { id: 'BV_share', label: 'handleShare()', group: 'function', info: { title: 'Share', items: ['Sharing.shareAsync'] } },
+          ],
+          edges: [
+            { from: 'BV_main', to: 'BV_fetch', arrows: 'to', label: 'useEffect' },
+            { from: 'BV_main', to: 'BV_genHtml', arrows: 'to' },
+            { from: 'BV_main', to: 'BV_print', arrows: 'to' },
+            { from: 'BV_main', to: 'BV_share', arrows: 'to' },
+          ]
+        },
+        BV_genHtml: {
+          nodes: [
+            { id: 'GH_start', label: 'Called on Render', group: 'step', shape: 'diamond', info: { title: 'Trigger', items: ['transactions state ready'] } },
+            { id: 'GH_header', label: 'Build Header', group: 'step', info: { title: 'HTML', items: ['Company name', 'Invoice number', 'Date'] } },
+            { id: 'GH_party', label: 'Party Details', group: 'step', info: { title: 'HTML', items: ['Contact name', 'GST number'] } },
+            { id: 'GH_table', label: 'Items Table', group: 'step', info: { title: 'HTML', items: ['Warehouse, Bags, Weight, Rate', 'Per-item amount'] } },
+            { id: 'GH_totals', label: 'Totals Section', group: 'step', info: { title: 'HTML', items: ['Subtotal', 'Less: Labour (purchase)', 'Tax (if applicable)', 'Grand Total'] } },
+            { id: 'GH_transport', label: 'Transport Table', group: 'step', info: { title: 'Sales Only', items: ['Transporter, Driver', 'Vehicle, Destination'] } },
+            { id: 'GH_return', label: 'Return HTML String', group: 'success', shape: 'diamond', info: { title: 'Output', items: ['Complete HTML document'] } },
+          ],
+          edges: [
+            { from: 'GH_start', to: 'GH_header', arrows: 'to' },
+            { from: 'GH_header', to: 'GH_party', arrows: 'to' },
+            { from: 'GH_party', to: 'GH_table', arrows: 'to' },
+            { from: 'GH_table', to: 'GH_totals', arrows: 'to' },
+            { from: 'GH_totals', to: 'GH_transport', arrows: 'to' },
+            { from: 'GH_transport', to: 'GH_return', arrows: 'to' },
+          ]
+        },
+      },
+
+      backend: {
+        root: {
+          nodes: [
+            { id: 'Main', label: 'main.py', group: 'router', shape: 'hexagon', info: { title: 'FastAPI Entry Point', items: ['FastAPI app', 'CORS middleware', 'Router inclusion'] } },
+            { id: 'Database', label: 'database.py', group: 'logic', info: { title: 'DB Connection', items: ['SQLModel engine', 'get_session dependency'] } },
+            { id: 'Models', label: 'models.py', group: 'model', shape: 'database', info: { title: 'SQLModel Classes', items: ['Grain, Warehouse, Contact', 'Transaction, PaymentHistory', 'User'] } },
+            { id: 'R_Auth', label: 'Auth Router', group: 'router', hasChildren: true, info: { title: '/auth, /users', items: ['Login, ME, Setup', 'User CRUD'], drill: '🔍 Click to explore' } },
+            { id: 'R_Master', label: 'Master Router', group: 'router', hasChildren: true, info: { title: '/master', items: ['Grains, Warehouses, Contacts'], drill: '🔍 Click to explore' } },
+            { id: 'R_Trx', label: 'Transaction Router', group: 'router', hasChildren: true, info: { title: '/transactions', items: ['Purchase, Sale, Payments'], drill: '🔍 Click to explore' } },
+            { id: 'R_Inv', label: 'Inventory Router', group: 'router', hasChildren: true, info: { title: '/inventory', items: ['Stock calculation'], drill: '🔍 Click to explore' } },
+            { id: 'R_Stats', label: 'Stats Router', group: 'router', hasChildren: true, info: { title: '/stats', items: ['Dashboard stats'], drill: '🔍 Click to explore' } },
+          ],
+          edges: [
+            { from: 'Main', to: 'Database', arrows: 'to', label: 'imports' },
+            { from: 'Main', to: 'R_Auth', arrows: 'to' },
+            { from: 'Main', to: 'R_Master', arrows: 'to' },
+            { from: 'Main', to: 'R_Trx', arrows: 'to' },
+            { from: 'Main', to: 'R_Inv', arrows: 'to' },
+            { from: 'Main', to: 'R_Stats', arrows: 'to' },
+          ]
+        },
+        R_Auth: {
+          nodes: [
+            { id: 'Auth_login', label: 'POST /auth/login', group: 'endpoint', hasChildren: true, info: { title: 'login_for_access_token()', items: ['Input: username, password', 'Output: Token'], drill: '🔍 Click for flow' } },
+            { id: 'Auth_me', label: 'GET /auth/me', group: 'endpoint', info: { title: 'read_users_me()', items: ['Requires: Bearer Token', 'Output: UserRead'] } },
+            { id: 'Auth_setup', label: 'POST /auth/setup', group: 'endpoint', info: { title: 'setup_initial_admin()', items: ['Only if no users', 'Creates admin'] } },
+            { id: 'Auth_list', label: 'GET /users/', group: 'endpoint', info: { title: 'list_users()', items: ['Admin only', 'Returns all users'] } },
+            { id: 'Auth_create', label: 'POST /users/', group: 'endpoint', info: { title: 'create_user()', items: ['Admin only', 'Input: UserCreate'] } },
+            { id: 'Auth_update', label: 'PUT /users/{id}', group: 'endpoint', info: { title: 'update_user()', items: ['Admin only', 'Password revokes tokens'] } },
+          ],
+          edges: []
+        },
+        Auth_login: {
+          nodes: [
+            { id: 'AL_start', label: 'Request', group: 'step', shape: 'diamond', info: { title: 'Input', items: ['username, password'] } },
+            { id: 'AL_query', label: 'Query User', group: 'step', info: { title: 'DB', items: ['SELECT * FROM user', 'WHERE username = ?'] } },
+            { id: 'AL_verify', label: 'Verify Password', group: 'step', info: { title: 'Check', items: ['PBKDF2-SHA256 hash'] } },
+            { id: 'AL_fail', label: '401 Unauthorized', group: 'error', info: { title: 'Error', items: ['Invalid credentials'] } },
+            { id: 'AL_token', label: 'Generate JWT', group: 'step', info: { title: 'Token', items: ['sub=username, v=token_version', 'Expires: 24h'] } },
+            { id: 'AL_response', label: 'Return Token', group: 'success', shape: 'diamond', info: { title: 'Output', items: ['access_token, user'] } },
+          ],
+          edges: [
+            { from: 'AL_start', to: 'AL_query', arrows: 'to' },
+            { from: 'AL_query', to: 'AL_verify', arrows: 'to' },
+            { from: 'AL_verify', to: 'AL_fail', arrows: 'to', label: 'invalid', color: { color: '#f87171' } },
+            { from: 'AL_verify', to: 'AL_token', arrows: 'to', label: 'valid' },
+            { from: 'AL_token', to: 'AL_response', arrows: 'to' },
+          ]
+        },
+        R_Master: {
+          nodes: [
+            { id: 'Mast_grainC', label: 'POST /master/grains', group: 'endpoint', info: { title: 'create_grain()', items: ['Input: name, hindi_name'] } },
+            { id: 'Mast_grainR', label: 'GET /master/grains', group: 'endpoint', info: { title: 'read_grains()', items: ['Output: List[Grain]'] } },
+            { id: 'Mast_whC', label: 'POST /warehouses', group: 'endpoint', info: { title: 'create_warehouse()', items: ['Input: name, location'] } },
+            { id: 'Mast_whR', label: 'GET /warehouses', group: 'endpoint', info: { title: 'read_warehouses()', items: ['Output: List[Warehouse]'] } },
+            { id: 'Mast_contC', label: 'POST /contacts', group: 'endpoint', info: { title: 'create_contact()', items: ['Input: name, type, phone'] } },
+            { id: 'Mast_contR', label: 'GET /contacts', group: 'endpoint', info: { title: 'read_contacts()', items: ['Output: List[Contact]'] } },
+          ],
+          edges: []
+        },
+        R_Trx: {
+          nodes: [
+            { id: 'Trx_create', label: 'POST /', group: 'endpoint', hasChildren: true, info: { title: 'create_transaction()', items: ['Create Purchase'], drill: '🔍 Click for flow' } },
+            { id: 'Trx_bulk', label: 'POST /bulk_sale', group: 'endpoint', hasChildren: true, info: { title: 'create_bulk_sale()', items: ['Multi-warehouse sale'], drill: '🔍 Click for flow' } },
+            { id: 'Trx_read', label: 'GET /', group: 'endpoint', info: { title: 'read_transactions()', items: ['Params: skip, limit'] } },
+            { id: 'Trx_bill', label: 'GET /bill/{id}', group: 'endpoint', info: { title: 'get_transaction_bill()', items: ['Returns grouped'] } },
+            { id: 'Trx_delete', label: 'DELETE /{id}', group: 'endpoint', info: { title: 'delete_transaction()', items: ['Remove by ID'] } },
+            { id: 'Trx_update', label: 'PUT /{id}', group: 'endpoint', info: { title: 'update_transaction()', items: ['Partial update'] } },
+            { id: 'Trx_payment', label: 'POST /{id}/payment', group: 'endpoint', hasChildren: true, info: { title: 'update_payment()', items: ['Record payment'], drill: '🔍 Click for flow' } },
+          ],
+          edges: []
+        },
+        Trx_create: {
+          nodes: [
+            { id: 'TC_start', label: 'Request', group: 'step', shape: 'diamond', info: { title: 'Input', items: ['type: purchase', 'grain_id, contact_id, etc.'] } },
+            { id: 'TC_calc', label: 'Calculate Total', group: 'step', info: { title: 'Formula', items: ['total = qty × rate - labour'] } },
+            { id: 'TC_invoice', label: 'Generate Invoice #', group: 'step', info: { title: 'Auto', items: ['MAX + 1'] } },
+            { id: 'TC_save', label: 'Save to DB', group: 'step', info: { title: 'Insert', items: ['session.add, commit'] } },
+            { id: 'TC_response', label: 'Return', group: 'success', shape: 'diamond', info: { title: 'Output', items: ['Transaction object'] } },
+          ],
+          edges: [
+            { from: 'TC_start', to: 'TC_calc', arrows: 'to' },
+            { from: 'TC_calc', to: 'TC_invoice', arrows: 'to' },
+            { from: 'TC_invoice', to: 'TC_save', arrows: 'to' },
+            { from: 'TC_save', to: 'TC_response', arrows: 'to' },
+          ]
+        },
+        Trx_bulk: {
+          nodes: [
+            { id: 'TB_start', label: 'BulkSaleCreate', group: 'step', shape: 'diamond', info: { title: 'Input', items: ['contact_id, grain_id', 'warehouses array'] } },
+            { id: 'TB_group', label: 'Generate Group ID', group: 'step', info: { title: 'UUID', items: ['Links all transactions'] } },
+            { id: 'TB_loop', label: 'For Each Warehouse', group: 'step', info: { title: 'Loop', items: ['Per allocation'] } },
+            { id: 'TB_stock', label: 'Validate Stock', group: 'step', info: { title: 'Check', items: ['available >= requested'] } },
+            { id: 'TB_fail', label: '400 Error', group: 'error', info: { title: 'Insufficient', items: ['Return error'] } },
+            { id: 'TB_save', label: 'Create Transaction', group: 'step', info: { title: 'Insert', items: ['With cost_price, expenses'] } },
+            { id: 'TB_response', label: 'Return List', group: 'success', shape: 'diamond', info: { title: 'Output', items: ['All transactions'] } },
+          ],
+          edges: [
+            { from: 'TB_start', to: 'TB_group', arrows: 'to' },
+            { from: 'TB_group', to: 'TB_loop', arrows: 'to' },
+            { from: 'TB_loop', to: 'TB_stock', arrows: 'to' },
+            { from: 'TB_stock', to: 'TB_fail', arrows: 'to', label: 'fail', color: { color: '#f87171' } },
+            { from: 'TB_stock', to: 'TB_save', arrows: 'to', label: 'ok' },
+            { from: 'TB_save', to: 'TB_loop', arrows: 'to', label: 'next', dashes: true },
+            { from: 'TB_save', to: 'TB_response', arrows: 'to', label: 'done' },
+          ]
+        },
+        Trx_payment: {
+          nodes: [
+            { id: 'TP_start', label: 'Payment Request', group: 'step', shape: 'diamond', info: { title: 'Input', items: ['transaction_id, amount'] } },
+            { id: 'TP_fetch', label: 'Fetch Transaction', group: 'step', info: { title: 'Query', items: ['session.get(Transaction, id)'] } },
+            { id: 'TP_calc', label: 'Calculate Pending', group: 'step', info: { title: 'Logic', items: ['net = total - shortage - deduction', 'pending = net - paid'] } },
+            { id: 'TP_validate', label: 'Validate Amount', group: 'step', info: { title: 'Check', items: ['amount <= pending'] } },
+            { id: 'TP_fail', label: '400 Error', group: 'error', info: { title: 'Overpayment', items: ['Reject'] } },
+            { id: 'TP_history', label: 'Create History', group: 'step', info: { title: 'PaymentHistory', items: ['Insert record'] } },
+            { id: 'TP_update', label: 'Update Status', group: 'step', info: { title: 'Logic', items: ['pending/partial/paid'] } },
+            { id: 'TP_response', label: 'Return Updated', group: 'success', shape: 'diamond', info: { title: 'Output', items: ['Transaction'] } },
+          ],
+          edges: [
+            { from: 'TP_start', to: 'TP_fetch', arrows: 'to' },
+            { from: 'TP_fetch', to: 'TP_calc', arrows: 'to' },
+            { from: 'TP_calc', to: 'TP_validate', arrows: 'to' },
+            { from: 'TP_validate', to: 'TP_fail', arrows: 'to', label: 'over', color: { color: '#f87171' } },
+            { from: 'TP_validate', to: 'TP_history', arrows: 'to', label: 'ok' },
+            { from: 'TP_history', to: 'TP_update', arrows: 'to' },
+            { from: 'TP_update', to: 'TP_response', arrows: 'to' },
+          ]
+        },
+        R_Inv: {
+          nodes: [
+            { id: 'Inv_get', label: 'GET /inventory/', group: 'endpoint', hasChildren: true, info: { title: 'get_inventory_status()', items: ['Aggregate stock'], drill: '🔍 Click for flow' } },
+          ],
+          edges: []
+        },
+        Inv_get: {
+          nodes: [
+            { id: 'IG_fetch', label: 'Fetch All', group: 'step', info: { title: 'Queries', items: ['All transactions, grains, warehouses'] } },
+            { id: 'IG_loop', label: 'Loop Transactions', group: 'step', info: { title: 'For each', items: ['Get grain_id, warehouse_id'] } },
+            { id: 'IG_calc', label: 'Aggregate', group: 'step', info: { title: 'Logic', items: ['purchase: add', 'sale: subtract'] } },
+            { id: 'IG_avg', label: 'Avg Price', group: 'step', info: { title: 'Per Grain', items: ['value / qty'] } },
+            { id: 'IG_return', label: 'Return', group: 'success', shape: 'diamond', info: { title: 'Output', items: ['List of inventory items'] } },
+          ],
+          edges: [
+            { from: 'IG_fetch', to: 'IG_loop', arrows: 'to' },
+            { from: 'IG_loop', to: 'IG_calc', arrows: 'to' },
+            { from: 'IG_calc', to: 'IG_avg', arrows: 'to' },
+            { from: 'IG_avg', to: 'IG_return', arrows: 'to' },
+          ]
+        },
+        R_Stats: {
+          nodes: [
+            { id: 'Stats_dash', label: 'GET /dashboard', group: 'endpoint', info: { title: 'get_dashboard_stats()', items: ['total_receivable', 'total_payable', 'total_inventory_value'] } },
+          ],
+          edges: []
+        },
+      }
+    };
+
+    const options = {
+      nodes: { font: { size: 12, face: 'Segoe UI', color: '#e2e8f0' }, borderWidth: 2, shadow: true },
+      edges: { width: 2, shadow: true, font: { size: 10, color: '#64748b', align: 'middle' }, color: { color: '#475569' }, smooth: { type: 'cubicBezier' } },
+      groups: {
+        router: { color: { background: '#f59e0b', border: '#d97706' }, shape: 'box', font: { color: '#1e293b' } },
+        screen: { color: { background: '#3b82f6', border: '#2563eb' }, shape: 'box' },
+        logic: { color: { background: '#22c55e', border: '#16a34a' }, shape: 'ellipse' },
+        model: { color: { background: '#64748b', border: '#475569' }, shape: 'database' },
+        function: { color: { background: '#8b5cf6', border: '#7c3aed' }, shape: 'box' },
+        component: { color: { background: '#06b6d4', border: '#0891b2' }, shape: 'ellipse' },
+        endpoint: { color: { background: '#ec4899', border: '#db2777' }, shape: 'box' },
+        step: { color: { background: '#6366f1', border: '#4f46e5' }, shape: 'box' },
+        error: { color: { background: '#ef4444', border: '#dc2626' }, shape: 'box' },
+        success: { color: { background: '#10b981', border: '#059669' }, shape: 'box' },
+      },
+      physics: { stabilization: { iterations: 80 }, barnesHut: { gravitationalConstant: -1500, springLength: 120 } },
+      interaction: { hover: true, tooltipDelay: 50 }
+    };
+
+    function updateLegend() {
+      const l = document.getElementById('legend');
+      const depth = navStack.length;
+      if (currentView === 'frontend') {
+        if (depth === 0) l.innerHTML = '<div class="legend-title">Legend</div><div class="legend-item"><div class="dot" style="background:#3b82f6"></div>Screen</div><div class="legend-item"><div class="dot" style="background:#22c55e"></div>Logic</div><div class="legend-item"><div class="dot" style="background:#f59e0b"></div>Router</div>';
+        else if (depth === 1) l.innerHTML = '<div class="legend-title">Legend</div><div class="legend-item"><div class="dot" style="background:#8b5cf6"></div>Function</div><div class="legend-item"><div class="dot" style="background:#06b6d4"></div>Component</div><div class="legend-item"><div class="dot" style="background:#22c55e"></div>Logic</div>';
+        else l.innerHTML = '<div class="legend-title">Legend</div><div class="legend-item"><div class="dot" style="background:#6366f1"></div>Step</div><div class="legend-item"><div class="dot" style="background:#10b981"></div>Success</div><div class="legend-item"><div class="dot" style="background:#ef4444"></div>Error</div>';
+      } else {
+        if (depth === 0) l.innerHTML = '<div class="legend-title">Legend</div><div class="legend-item"><div class="dot" style="background:#f59e0b"></div>Router</div><div class="legend-item"><div class="dot" style="background:#64748b"></div>Model</div>';
+        else if (depth === 1) l.innerHTML = '<div class="legend-title">Legend</div><div class="legend-item"><div class="dot" style="background:#ec4899"></div>Endpoint</div><div class="legend-item"><div class="dot" style="background:#22c55e"></div>Helpers</div>';
+        else l.innerHTML = '<div class="legend-title">Legend</div><div class="legend-item"><div class="dot" style="background:#6366f1"></div>Step</div><div class="legend-item"><div class="dot" style="background:#10b981"></div>Success</div><div class="legend-item"><div class="dot" style="background:#ef4444"></div>Error</div>';
+      }
+    }
+
+    function updateBreadcrumb() {
+      const b = document.getElementById('breadcrumb');
+      b.innerHTML = navStack.length ? navStack.map(n => `<span>${n}</span>`).join(' → ') : '';
+    }
+
+    function showTooltip(node) {
+      if (!node || !node.info) { tooltipEl.style.display = 'none'; return; }
+      let html = `<div class="tt-title">${node.info.title}</div>`;
+      if (node.info.items && node.info.items.length) {
+        html += node.info.items.map(i => `<div class="tt-item">• ${i}</div>`).join('');
+      }
+      if (node.info.drill) html += `<div class="tt-drill">${node.info.drill}</div>`;
+      tooltipEl.innerHTML = html;
+      tooltipEl.style.left = Math.min(mouseX + 15, window.innerWidth - 340) + 'px';
+      tooltipEl.style.top = Math.min(mouseY + 15, window.innerHeight - 250) + 'px';
+      tooltipEl.style.display = 'block';
+    }
+
+    function hideTooltip() { tooltipEl.style.display = 'none'; }
+
+    function loadGraph(viewKey) {
+      const data = graphData[currentView][viewKey] || graphData[currentView].root;
+      if (network) network.destroy();
+      network = new vis.Network(container, data, options);
+
+      network.on('hoverNode', function (p) {
+        const node = data.nodes.find(n => n.id === p.node);
+        showTooltip(node);
+      });
+      network.on('blurNode', hideTooltip);
+      network.on('click', function (p) {
+        hideTooltip();
+        if (p.nodes.length) {
+          const nodeId = p.nodes[0];
+          const node = data.nodes.find(n => n.id === nodeId);
+          if (node && node.hasChildren && graphData[currentView][nodeId]) {
+            navStack.push(node.label.replace(/\n/g, ' '));
+            navKeys.push(nodeId);
+            document.getElementById('back-btn').style.display = 'inline-block';
+            updateBreadcrumb();
+            updateLegend();
+            loadGraph(nodeId);
+          }
+        }
+      });
+    }
+
+    function switchView(type) {
+      currentView = type;
+      navStack = [];
+      navKeys = [];
+      document.getElementById('back-btn').style.display = 'none';
+      document.getElementById('btn-frontend').className = type === 'frontend' ? 'active' : '';
+      document.getElementById('btn-backend').className = type === 'backend' ? 'active' : '';
+      updateBreadcrumb();
+      updateLegend();
+      loadGraph('root');
+    }
+
+    function goBack() {
+      if (navStack.length === 0) return;
+      navStack.pop();
+      navKeys.pop();
+      if (navStack.length === 0) {
+        document.getElementById('back-btn').style.display = 'none';
+        updateBreadcrumb();
+        updateLegend();
+        loadGraph('root');
+      } else {
+        updateBreadcrumb();
+        updateLegend();
+        loadGraph(navKeys[navKeys.length - 1]);
+      }
+    }
+
+    switchView('frontend');
+  </script>
+</body>
+
+</html>

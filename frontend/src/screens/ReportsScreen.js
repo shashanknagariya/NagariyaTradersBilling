@@ -85,10 +85,13 @@ const ReportsScreen = () => {
             if (reportType === 'sale' && t.type !== 'sale') return false;
             if (reportType === 'purchase' && t.type !== 'purchase') return false;
 
-            if (analyticsStartDate && new Date(t.date) < new Date(analyticsStartDate)) return false;
+            if (analyticsStartDate) {
+                const s = new Date(analyticsStartDate); s.setHours(0, 0, 0, 0);
+                if (new Date(t.date).getTime() < s.getTime()) return false;
+            }
             if (analyticsEndDate) {
-                const d = new Date(analyticsEndDate); d.setHours(23, 59, 59);
-                if (new Date(t.date) > d) return false;
+                const e = new Date(analyticsEndDate); e.setHours(23, 59, 59, 999);
+                if (new Date(t.date).getTime() > e.getTime()) return false;
             }
             return true;
         });
@@ -323,13 +326,12 @@ const ReportsScreen = () => {
 
             // 3. Date Filter
             if (filterStartDate) {
-                if (new Date(t.date) < new Date(filterStartDate)) return false;
+                const s = new Date(filterStartDate); s.setHours(0, 0, 0, 0);
+                if (new Date(t.date).getTime() < s.getTime()) return false;
             }
             if (filterEndDate) {
-                // Ensure end of day cover
-                const d = new Date(filterEndDate);
-                d.setHours(23, 59, 59);
-                if (new Date(t.date) > d) return false;
+                const e = new Date(filterEndDate); e.setHours(23, 59, 59, 999);
+                if (new Date(t.date).getTime() > e.getTime()) return false;
             }
 
             // 4. Search Filter (Invoice OR Party)
@@ -402,8 +404,9 @@ const ReportsScreen = () => {
                             })()}
                         </View>
                     </View>
+
                     <View className="flex-row justify-between mb-2">
-                        <Text className="text-gray-500">{item.quantity_quintal} Qtl @ ₹{item.rate_per_quintal}</Text>
+                        <Text className="text-gray-500">{item.quantity_quintal} Qtl @ ₹{item.rate_per_quintal} | Bags: {item.number_of_bags || '-'}</Text>
                         <Text className="text-xs text-gray-400">Paid: ₹{(item.amount_paid || 0).toFixed(2)}</Text>
                     </View>
                 </TouchableOpacity>
@@ -649,6 +652,41 @@ const ReportsScreen = () => {
                                         )}
                                     </View>
                                 ))}
+
+                                {/* Total Row */}
+                                {reportData.length > 0 && (
+                                    <View className="flex-row border-t-2 border-brand-navy py-2 mt-2 bg-gray-50">
+                                        {groupBy !== 'none' ? (
+                                            <>
+                                                <Text className="w-32 font-bold text-brand-navy">TOTAL</Text>
+                                                <Text className="w-20 text-right font-bold">{reportData.reduce((sum, d) => sum + d.count, 0)}</Text>
+                                                <Text className="w-24 text-right font-bold">{reportData.reduce((sum, d) => sum + d.qty, 0).toFixed(2)}</Text>
+                                                <Text className="w-28 text-right font-bold">₹{reportData.reduce((sum, d) => sum + d.amount, 0).toFixed(0)}</Text>
+                                                <Text className="w-24 text-right font-bold">₹{reportData.reduce((sum, d) => sum + d.profit, 0).toFixed(0)}</Text>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Text className="w-[176px] font-bold text-brand-navy">TOTAL</Text> {/* Date + Invoice + Party */}
+                                                <Text className="w-24 font-bold"></Text> {/* Grain */}
+                                                <Text className="w-16 text-right font-bold">{reportData.reduce((sum, d) => sum + (d.number_of_bags || 0), 0)}</Text>
+                                                <Text className="w-16 text-right font-bold">{reportData.reduce((sum, d) => sum + d.quantity_quintal, 0).toFixed(2)}</Text>
+                                                <Text className="w-16 text-right font-bold"></Text> {/* Rate */}
+                                                <Text className="w-20 text-right font-bold">{reportData.reduce((sum, d) => sum + d.baseAmount, 0).toFixed(0)}</Text>
+                                                <Text className="w-16 text-right font-bold">{reportData.reduce((sum, d) => sum + d.shortageCost, 0).toFixed(0)}</Text>
+                                                <Text className="w-16 text-right font-bold">{reportData.reduce((sum, d) => sum + d.deductionCost, 0).toFixed(0)}</Text>
+                                                <Text className="w-16 text-right font-bold">{reportData.reduce((sum, d) => sum + d.labourCostTotal, 0).toFixed(0)}</Text>
+                                                <Text className="w-16 text-right font-bold">{reportData.reduce((sum, d) => sum + d.transportCostTotal, 0).toFixed(0)}</Text>
+                                                <Text className="w-24 text-right font-bold">{reportData.reduce((sum, d) => sum + d.netRealized, 0).toFixed(0)}</Text>
+                                                {reportType === 'profit' && (
+                                                    <>
+                                                        <Text className="w-20 text-right font-bold"></Text>
+                                                        <Text className="w-24 text-right font-bold">{reportData.reduce((sum, d) => sum + d.profit, 0).toFixed(0)}</Text>
+                                                    </>
+                                                )}
+                                            </>
+                                        )}
+                                    </View>
+                                )}
                             </View>
                         </ScrollView>
                     </ScrollView>

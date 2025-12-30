@@ -124,20 +124,15 @@ const BillViewScreen = () => {
 
         // Rows HTML
         const rowsHtml = billData.map((item, index) => {
-            const wh = warehouses[item.warehouse_id]?.name || 'Unknown';
+            // const wh = warehouses[item.warehouse_id]?.name || 'Unknown'; // User requested to remove warehouse name
             const bharti = (item.number_of_bags && item.quantity_quintal)
                 ? ((item.quantity_quintal * 100) / item.number_of_bags).toFixed(2)
                 : '-';
 
-            // We show RATE as ITEM RATE (Basic) or Inclusive?
-            // Usually Sales Bill shows RATE (Basic). 
-            // In DB, `rate_per_quintal` was used to calc subtotal. S it is Basic Rate.
-            // Good.
-
             return `
                 <tr>
                     <td style="text-align: center;">${index + 1}</td>
-                    <td>${grain.name} (${grain.hindi_name || ''})<br/><small>Loading: ${wh}</small></td>
+                    <td>${grain.name} (${grain.hindi_name || ''})</td>
                     <td style="text-align: center;">${item.number_of_bags || '-'}</td>
                     <td style="text-align: center;">${bharti}</td>
                     <td style="text-align: right;">${item.quantity_quintal.toFixed(2)} QTL</td>
@@ -204,27 +199,30 @@ const BillViewScreen = () => {
                     <td class="no-border">Dated<br/><b>${new Date(mainTrx.date).toLocaleDateString()}</b></td>
                 </tr>
                 <tr>
-                    <td class="no-border">Delivery Note<br/>-</td>
-                    <td class="no-border">Mode/Terms of Payment<br/>-</td>
+                    <td class="no-border">Transporter Name<br/>${mainTrx.transporter_name || '-'}</td>
+                    <td class="no-border">Vehicle No.<br/>${mainTrx.vehicle_number || '-'}</td>
                 </tr>
                 <tr>
-                    <td class="no-border">Reference No. & Date.<br/>-</td>
-                    <td class="no-border">Other References<br/>-</td>
-                </tr>
-                <tr>
-                    <td class="no-border">Buyer's Order No.<br/>-</td>
-                    <td class="no-border">Dated<br/>-</td>
-                </tr>
-                <tr>
-                    <td class="no-border">Dispatch Doc No.<br/>-</td>
-                    <td class="no-border">Delivery Note Date<br/>-</td>
-                </tr>
-                <tr>
-                    <td class="no-border">Dispatched through<br/>${mainTrx.vehicle_number || '-'}</td>
+                    <td class="no-border">Driver Name<br/>${mainTrx.driver_name || '-'}</td>
                     <td class="no-border">Destination<br/>${mainTrx.destination || 'KATNI'}</td>
+                </tr>
+                 <tr>
+                    <td class="no-border">Dispatched through<br/>${mainTrx.vehicle_number || '-'}</td>
+                     <td class="no-border"></td>
                 </tr>
             </table>
         `;
+
+        // Bank Details
+        const bankDetails = !isPurchase ? `
+            <div style="margin-top: 10px; border: 1px solid black; padding: 5px; font-size: 9px;">
+                <strong>Bank Details:</strong><br/>
+                Bank Name: ${process.env.EXPO_PUBLIC_BANK_NAME || '-'}<br/>
+                A/C No.: ${process.env.EXPO_PUBLIC_BANK_ACCOUNT_NO || '-'}<br/>
+                IFSC Code: ${process.env.EXPO_PUBLIC_BANK_IFSC || '-'}<br/>
+                Holder Name: ${process.env.EXPO_PUBLIC_BANK_HOLDER_NAME || '-'}
+            </div>
+        ` : '';
 
         return `
             <html>
@@ -348,6 +346,7 @@ const BillViewScreen = () => {
                                         Tax Amount (in words): ${totalTax > 0 ? totalTax.toFixed(2) : 'NIL'}<br/><br/>
                                         Declaration:<br/>
                                         We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.
+                                        ${bankDetails}
                                     </div>
                                     <div style="text-align: right; border-left: 1px solid black; padding-left: 10px;">
                                         <br/>
@@ -366,7 +365,19 @@ const BillViewScreen = () => {
     const generatePdf = async () => {
         try {
             const { uri } = await Print.printToFileAsync({ html: htmlContent });
-            await Sharing.shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
+
+            // Rename file
+            const contact = contacts[mainTrx.contact_id] || {};
+            const partyName = (contact.name || 'Unknown').replace(/[^a-zA-Z0-9]/g, '_');
+            const fileName = `${partyName}_${mainTrx.invoice_number || 'INV'}.pdf`;
+            const newUri = FileSystem.documentDirectory + fileName;
+
+            await FileSystem.moveAsync({
+                from: uri,
+                to: newUri
+            });
+
+            await Sharing.shareAsync(newUri, { UTI: '.pdf', mimeType: 'application/pdf', dialogTitle: `Share Invoice ${fileName}` });
         } catch (error) {
             console.error(error);
             Alert.alert("Error", "Failed to generate PDF");
