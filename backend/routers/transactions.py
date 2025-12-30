@@ -64,7 +64,8 @@ def create_bulk_sale(sale_data: BulkSaleCreate, session: Session = Depends(get_s
     # 1. Calculate Average Purchase Cost (for Profit visibility)
     # Fetch all purchases for this grain
     purchases = session.exec(select(Transaction).where(Transaction.type == "purchase", Transaction.grain_id == sale_data.grain_id)).all()
-    total_p_val = sum(p.total_amount for p in purchases)
+    # Calculate using Cost to Company (Gross Rate)
+    total_p_val = sum(p.quantity_quintal * p.rate_per_quintal for p in purchases)
     total_p_qty = sum(p.quantity_quintal for p in purchases)
     avg_cost = total_p_val / total_p_qty if total_p_qty > 0 else 0.0
     
@@ -172,6 +173,12 @@ def delete_transaction(transaction_id: int, session: Session = Depends(get_sessi
     transaction = session.get(Transaction, transaction_id)
     if not transaction:
         return {"error": "Transaction not found"}
+    
+    # Cascade Delete: Remove associated payment history first
+    payments = session.exec(select(PaymentHistory).where(PaymentHistory.transaction_id == transaction_id)).all()
+    for p in payments:
+        session.delete(p)
+
     session.delete(transaction)
     session.commit()
     return {"ok": True}
@@ -253,6 +260,8 @@ class TransactionUpdate(BaseModel):
     shortage_quantity: Optional[float] = None
     deduction_amount: Optional[float] = None
     deduction_note: Optional[str] = None
+    labour_cost_per_bag: Optional[float] = None
+    transport_cost_per_qtl: Optional[float] = None
 
 @router.put("/{transaction_id}", response_model=Transaction)
 def update_transaction(transaction_id: int, updates: TransactionUpdate, session: Session = Depends(get_session)):

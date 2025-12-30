@@ -525,7 +525,7 @@
             { id: 'Trx_bulk', label: 'POST /bulk_sale', group: 'endpoint', hasChildren: true, info: { title: 'create_bulk_sale()', items: ['Multi-warehouse sale'], drill: '🔍 Click for flow' } },
             { id: 'Trx_read', label: 'GET /', group: 'endpoint', info: { title: 'read_transactions()', items: ['Params: skip, limit'] } },
             { id: 'Trx_bill', label: 'GET /bill/{id}', group: 'endpoint', info: { title: 'get_transaction_bill()', items: ['Returns grouped'] } },
-            { id: 'Trx_delete', label: 'DELETE /{id}', group: 'endpoint', info: { title: 'delete_transaction()', items: ['Remove by ID'] } },
+            { id: 'Trx_delete', label: 'DELETE /{id}', group: 'endpoint', info: { title: 'delete_transaction()', items: ['Remove by ID', 'Cascade delete payments'] } },
             { id: 'Trx_update', label: 'PUT /{id}', group: 'endpoint', info: { title: 'update_transaction()', items: ['Partial update'] } },
             { id: 'Trx_payment', label: 'POST /{id}/payment', group: 'endpoint', hasChildren: true, info: { title: 'update_payment()', items: ['Record payment'], drill: '🔍 Click for flow' } },
           ],

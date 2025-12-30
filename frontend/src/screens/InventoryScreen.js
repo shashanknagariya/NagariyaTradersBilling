@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, ScrollView, Platform, Alert, ActivityIndicator } from 'react-native';
 import client from '../api/client';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 
@@ -11,9 +11,11 @@ const InventoryScreen = () => {
     const [loading, setLoading] = useState(true);
     const [expandedGrain, setExpandedGrain] = useState(null);
 
-    useEffect(() => {
-        fetchInventory();
-    }, []);
+    useFocusEffect(
+        React.useCallback(() => {
+            fetchInventory();
+        }, [])
+    );
 
     const fetchInventory = async () => {
         try {

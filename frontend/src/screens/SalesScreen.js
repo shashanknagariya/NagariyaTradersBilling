@@ -33,6 +33,7 @@ const SalesScreen = () => {
     const [vehicleNo, setVehicleNo] = useState('');
     const [driverName, setDriverName] = useState('');
     const [destination, setDestination] = useState('');
+    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
 
     // Creation States
     const [isBuyerModalOpen, setIsBuyerModalOpen] = useState(false);
@@ -107,6 +108,7 @@ const SalesScreen = () => {
             }));
 
         const payload = {
+            date: new Date(date).toISOString(),
             contact_id: selectedBuyer.id,
             grain_id: selectedGrain.id,
             rate_per_quintal: parseFloat(rate),
@@ -191,6 +193,32 @@ const SalesScreen = () => {
     function renderContent() {
         return (
             <View className="bg-white p-6 rounded-2xl shadow-sm">
+
+                <Text className="text-brand-navy font-bold mb-2 ml-1">Date</Text>
+                {Platform.OS === 'web' ? (
+                    <input
+                        type="date"
+                        value={date}
+                        onChange={(e) => setDate(e.target.value)}
+                        style={{
+                            padding: 12,
+                            borderRadius: 8,
+                            border: '1px solid #e5e7eb',
+                            fontSize: 16,
+                            marginBottom: 16,
+                            backgroundColor: '#f9fafb',
+                            width: '100%',
+                            boxSizing: 'border-box'
+                        }}
+                    />
+                ) : (
+                    <TextInput
+                        className="bg-gray-50 p-4 rounded-xl text-lg border border-gray-200 mb-4"
+                        value={date}
+                        onChangeText={setDate}
+                        placeholder="YYYY-MM-DD"
+                    />
+                )}
 
                 {/* 1. Party Details */}
                 <Text className="text-xl font-bold text-brand-navy mb-4 border-b border-gray-100 pb-2">Party Details</Text>

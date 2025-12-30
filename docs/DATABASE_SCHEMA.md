@@ -202,7 +202,7 @@ Stores application users and their credentials.
 | `Transaction → Grain` | Each transaction is for one grain type |
 | `Transaction → Contact` | Each transaction is with one contact |
 | `Transaction → Warehouse` | Each transaction affects one warehouse's inventory |
-| `Transaction → PaymentHistory` | A transaction can have multiple partial payments |
+| `Transaction → PaymentHistory` | A transaction can have multiple partial payments (Cascade Deleted via App Logic) |
 | `Transaction.sale_group_id` | Groups multiple sale transactions into one bill (multi-warehouse sale) |
 
 ---

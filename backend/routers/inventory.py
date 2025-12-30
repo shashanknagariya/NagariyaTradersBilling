@@ -59,7 +59,9 @@ def get_inventory_status(session: Session = Depends(get_session)):
             inventory[gid]["warehouses"][wid]["quintal"] += qty
             
             # Avg Price Calc (Only add purchases)
-            inventory[gid]["purchased_value"] += trx.total_amount
+            # Use Gross Amount (Cost to Company) = Qty * Rate
+            # (Previously used total_amount which was Net Payout after Labour deduction)
+            inventory[gid]["purchased_value"] += (qty * trx.rate_per_quintal)
             inventory[gid]["purchased_qty"] += qty
             
         elif trx.type == 'sale':

@@ -27,6 +27,10 @@ const EditTransactionScreen = () => {
     const [driverName, setDriverName] = useState('');
     const [destination, setDestination] = useState('');
 
+    // Cost Fields
+    const [labourCost, setLabourCost] = useState('');
+    const [transportCost, setTransportCost] = useState('');
+
     const [notes, setNotes] = useState('');
 
     // Master Data
@@ -80,6 +84,9 @@ const EditTransactionScreen = () => {
             setDestination(target.destination || '');
             setNotes(target.notes || '');
 
+            setLabourCost(target.labour_cost_per_bag ? target.labour_cost_per_bag.toString() : '3.0');
+            setTransportCost(target.transport_cost_per_qtl ? target.transport_cost_per_qtl.toString() : '0.0');
+
         } catch (e) {
             console.error(e);
             Alert.alert("Error", "Failed to load data");
@@ -124,7 +131,9 @@ const EditTransactionScreen = () => {
                 number_of_bags: parseFloat(numBags) || 0,
                 rate_per_quintal: r,
                 total_amount: total,
-                notes: notes
+                notes: notes,
+                labour_cost_per_bag: parseFloat(labourCost) || 0,
+                transport_cost_per_qtl: parseFloat(transportCost) || 0
             };
 
             // Only add sales fields if it's a sale
@@ -159,8 +168,26 @@ const EditTransactionScreen = () => {
             <ScrollView className="p-6">
                 <View className="bg-white p-6 rounded-xl shadow-sm mb-6">
 
-                    <Label>Date (YYYY-MM-DD)</Label>
-                    <Input value={date} onChangeText={setDate} placeholder="2023-10-25" />
+                    <Label>Date</Label>
+                    {Platform.OS === 'web' ? (
+                        <input
+                            type="date"
+                            value={date}
+                            onChange={(e) => setDate(e.target.value)}
+                            style={{
+                                padding: 12,
+                                borderRadius: 8,
+                                border: '1px solid #e5e7eb',
+                                fontSize: 16,
+                                marginBottom: 16,
+                                backgroundColor: '#f9fafb',
+                                width: '100%',
+                                boxSizing: 'border-box'
+                            }}
+                        />
+                    ) : (
+                        <Input value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" />
+                    )}
 
                     {/* Simple Dropdowns (Text for now, improved UI later if needed) */}
                     <Label>Items (Grain)</Label>
@@ -200,6 +227,21 @@ const EditTransactionScreen = () => {
 
                     <Label>Rate (₹/Qtl)</Label>
                     <Input value={rate} onChangeText={setRate} keyboardType="numeric" />
+
+                    {/* NEW COST FIELDS */}
+                    <View className="h-[1px] bg-gray-200 my-4" />
+                    <Text className="font-bold text-gray-400 mb-4 uppercase tracking-widest text-xs">Cost Details</Text>
+
+                    <Label>Labour Cost / Bag (Palledari)</Label>
+                    <Input value={labourCost} onChangeText={setLabourCost} keyboardType="numeric" placeholder="3.0" />
+
+                    {isSale && (
+                        <>
+                            <Label>Transport Cost / Qtl</Label>
+                            <Input value={transportCost} onChangeText={setTransportCost} keyboardType="numeric" placeholder="0.0" />
+                        </>
+                    )}
+
 
                     {isSale && (
                         <>

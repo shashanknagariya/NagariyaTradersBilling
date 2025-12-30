@@ -301,6 +301,8 @@ Update a transaction.
 
 Delete a transaction.
 
+**Note**: This action will **cascade delete** all associated `PaymentHistory` records.
+
 ---
 
 ## Payments

@@ -219,25 +219,33 @@ const ReportsScreen = () => {
     };
 
     const handleDelete = (id) => {
-        Alert.alert(
-            "Delete Transaction",
-            "Are you sure? This will update inventory.",
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Delete",
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            await client.delete(`/transactions/${id}`);
-                            fetchData(); // Refresh
-                        } catch (e) {
-                            Alert.alert("Error", "Failed to delete");
-                        }
+        const doDelete = async () => {
+            try {
+                await client.delete(`/transactions/${id}`);
+                fetchData(); // Refresh
+            } catch (e) {
+                Alert.alert("Error", "Failed to delete");
+            }
+        };
+
+        if (Platform.OS === 'web') {
+            if (window.confirm("Are you sure you want to delete this transaction? This will update inventory.")) {
+                doDelete();
+            }
+        } else {
+            Alert.alert(
+                "Delete Transaction",
+                "Are you sure? This will update inventory.",
+                [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                        text: "Delete",
+                        style: 'destructive',
+                        onPress: doDelete
                     }
-                }
-            ]
-        );
+                ]
+            );
+        }
     };
 
     const openPaymentModal = (item) => {
