@@ -79,7 +79,7 @@ def get_inventory_status(session: Session = Depends(get_session)):
         if not grain_obj: continue
         
         avg_price = 0
-        if data["purchased_qty"] > 0:
+        if data["purchased_qty"] > 0 and data["total_quintal"] > 0.01:
             avg_price = data["purchased_value"] / data["purchased_qty"]
             
         # Format warehouses list
