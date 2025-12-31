@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, Platform, ActivityIndicator } from 'react-native';
 import client from '../api/client';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { useLanguage } from '../context/LanguageContext';
 
 
 const EditTransactionScreen = () => {
     const navigation = useNavigation();
     const route = useRoute();
     const { transactionId } = route.params;
+    const { t } = useLanguage();
 
     const [loading, setLoading] = useState(true);
     const [originalTrx, setOriginalTrx] = useState(null);
@@ -144,11 +146,11 @@ const EditTransactionScreen = () => {
             }
 
             await client.put(`/transactions/${transactionId}`, updatePayload);
-            Alert.alert("Success", "Transaction Updated");
+            Alert.alert(t('success'), t('transactionUpdated'));
             navigation.goBack();
         } catch (e) {
             console.error(e);
-            Alert.alert("Error", "Failed to update");
+            Alert.alert(t('error'), t('failedToUpdate'));
         }
     };
 
@@ -162,18 +164,19 @@ const EditTransactionScreen = () => {
                 <TouchableOpacity onPress={() => navigation.goBack()} className="mr-4">
                     <Text className="text-white text-2xl">←</Text>
                 </TouchableOpacity>
-                <Text className="text-xl font-bold text-white">Edit {isSale ? 'Sale' : 'Purchase'} #{transactionId}</Text>
+                <Text className="text-xl font-bold text-white">{isSale ? t('editSale') : t('editPurchase')} #{transactionId}</Text>
             </View>
 
             <ScrollView className="p-6">
                 <View className="bg-white p-6 rounded-xl shadow-sm mb-6">
 
-                    <Label>Date</Label>
+                    <Label>{t('date')}</Label>
                     {Platform.OS === 'web' ? (
                         <input
                             type="date"
                             value={date}
                             onChange={(e) => setDate(e.target.value)}
+                            onClick={(e) => e.target.showPicker()}
                             style={{
                                 padding: 12,
                                 borderRadius: 8,
@@ -190,7 +193,7 @@ const EditTransactionScreen = () => {
                     )}
 
                     {/* Simple Dropdowns (Text for now, improved UI later if needed) */}
-                    <Label>Items (Grain)</Label>
+                    <Label>{t('items')}</Label>
                     <View className="flex-row flex-wrap mb-4">
                         {grains.map(g => (
                             <TouchableOpacity
@@ -203,7 +206,7 @@ const EditTransactionScreen = () => {
                         ))}
                     </View>
 
-                    <Label>Warehouse</Label>
+                    <Label>{t('warehouse')}</Label>
                     <View className="flex-row flex-wrap mb-4">
                         {warehouses.map(w => (
                             <TouchableOpacity
@@ -216,28 +219,28 @@ const EditTransactionScreen = () => {
                         ))}
                     </View>
 
-                    <Label>No. of Bags</Label>
+                    <Label>{t('noOfBags')}</Label>
                     <Input value={numBags} onChangeText={handleBagsChange} keyboardType="numeric" />
 
-                    <Label>Bharti (Kg/Bag)</Label>
+                    <Label>{t('bharti')}</Label>
                     <Input value={bharti} onChangeText={handleBhartiChange} keyboardType="numeric" placeholder="e.g. 50" />
 
-                    <Label>Quantity (Qtl) - Calculated</Label>
+                    <Label>{t('quantityQtl')}</Label>
                     <Input value={quantityQtl} onChangeText={setQuantityQtl} keyboardType="numeric" />
 
-                    <Label>Rate (₹/Qtl)</Label>
+                    <Label>{t('ratePerQtl')}</Label>
                     <Input value={rate} onChangeText={setRate} keyboardType="numeric" />
 
                     {/* NEW COST FIELDS */}
                     <View className="h-[1px] bg-gray-200 my-4" />
-                    <Text className="font-bold text-gray-400 mb-4 uppercase tracking-widest text-xs">Cost Details</Text>
+                    <Text className="font-bold text-gray-400 mb-4 uppercase tracking-widest text-xs">{t('costDetails')}</Text>
 
-                    <Label>Labour Cost / Bag (Palledari)</Label>
+                    <Label>{t('labourCostPerBag')}</Label>
                     <Input value={labourCost} onChangeText={setLabourCost} keyboardType="numeric" placeholder="3.0" />
 
                     {isSale && (
                         <>
-                            <Label>Transport Cost / Qtl</Label>
+                            <Label>{t('transportCostPerQtl')}</Label>
                             <Input value={transportCost} onChangeText={setTransportCost} keyboardType="numeric" placeholder="0.0" />
                         </>
                     )}
@@ -246,27 +249,27 @@ const EditTransactionScreen = () => {
                     {isSale && (
                         <>
                             <View className="h-[1px] bg-gray-200 my-4" />
-                            <Text className="font-bold text-gray-400 mb-4 uppercase tracking-widest text-xs">Dispatch Details</Text>
+                            <Text className="font-bold text-gray-400 mb-4 uppercase tracking-widest text-xs">{t('dispatchDetails')}</Text>
 
-                            <Label>Vehicle No.</Label>
+                            <Label>{t('vehicleNo')}</Label>
                             <Input value={vehicleNumber} onChangeText={setVehicleNumber} placeholder="MP-21-..." />
 
-                            <Label>Driver Name</Label>
+                            <Label>{t('driverName')}</Label>
                             <Input value={driverName} onChangeText={setDriverName} />
 
-                            <Label>Destination</Label>
+                            <Label>{t('destination')}</Label>
                             <Input value={destination} onChangeText={setDestination} />
                         </>
                     )}
 
-                    <Label>Notes</Label>
+                    <Label>{t('notes')}</Label>
                     <Input value={notes} onChangeText={setNotes} multiline />
 
                     <TouchableOpacity
                         onPress={handleSave}
                         className="bg-brand-gold p-4 rounded-xl items-center mt-4"
                     >
-                        <Text className="font-bold text-brand-navy text-lg">Save Changes</Text>
+                        <Text className="font-bold text-brand-navy text-lg">{t('saveChanges')}</Text>
                     </TouchableOpacity>
                 </View>
             </ScrollView>

@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, Modal, FlatList, Platform, KeyboardAvoidingView } from 'react-native';
 import client from '../api/client';
 import { useNavigation } from '@react-navigation/native';
+import { useLanguage } from '../context/LanguageContext';
 
 const PurchaseScreen = () => {
     const navigation = useNavigation();
+    const { t } = useLanguage();
     const [grains, setGrains] = useState([]);
     const [warehouses, setWarehouses] = useState([]);
     const [contacts, setContacts] = useState([]); // Suppliers
@@ -213,7 +215,7 @@ const PurchaseScreen = () => {
                     <TouchableOpacity onPress={() => navigation.goBack()} className="mr-4">
                         <Text className="text-white text-2xl">←</Text>
                     </TouchableOpacity>
-                    <Text className="text-2xl font-bold text-white">New Purchase</Text>
+                    <Text className="text-2xl font-bold text-white">{t('purchase')}</Text>
                 </View>
             </View>
 
@@ -224,12 +226,13 @@ const PurchaseScreen = () => {
                     showsVerticalScrollIndicator={false}
                 >
                     <View className="bg-white p-6 rounded-2xl shadow-sm">
-                        <Text className="text-brand-navy font-bold mb-2 ml-1">Date</Text>
+                        <Text className="text-brand-navy font-bold mb-2 ml-1">{t('date')}</Text>
                         {Platform.OS === 'web' ? (
                             <input
                                 type="date"
                                 value={date}
                                 onChange={(e) => setDate(e.target.value)}
+                                onClick={(e) => e.target.showPicker()}
                                 style={{
                                     padding: 12,
                                     borderRadius: 8,
@@ -251,29 +254,29 @@ const PurchaseScreen = () => {
                         )}
 
                         <Dropdown
-                            label="Select Grain"
+                            label={t('selectGrain')}
                             value={selectedGrain?.name}
-                            placeholder="Choose Grain..."
+                            placeholder={t('selectGrain')}
                             onPress={() => setIsGrainModalOpen(true)}
                         />
 
                         <Dropdown
-                            label="Supplier (Person)"
+                            label={t('supplier')}
                             value={selectedContact?.name}
-                            placeholder="Choose Supplier..."
+                            placeholder={t('supplier')}
                             onPress={() => setIsContactModalOpen(true)}
                         />
 
                         <Dropdown
-                            label="Storage Location"
+                            label={t('storageLocation')}
                             value={selectedWarehouse?.name}
-                            placeholder="Choose Warehouse..."
+                            placeholder={t('selectWarehouse')}
                             onPress={() => setIsWarehouseModalOpen(true)}
                         />
 
                         <View className="flex-row justify-between mb-4">
                             <View className="w-[48%]">
-                                <Text className="text-brand-navy font-bold mb-2 ml-1">No. of Bags</Text>
+                                <Text className="text-brand-navy font-bold mb-2 ml-1">{t('bags')}</Text>
                                 <TextInput
                                     className={`bg-gray-50 p-4 rounded-xl text-xl border border-gray-200 focus:border-brand-gold ${Platform.OS === 'web' ? 'outline-none' : ''}`}
                                     keyboardType="numeric"
@@ -283,7 +286,7 @@ const PurchaseScreen = () => {
                                 />
                             </View>
                             <View className="w-[48%]">
-                                <Text className="text-brand-navy font-bold mb-2 ml-1">Bharti (kg/bag)</Text>
+                                <Text className="text-brand-navy font-bold mb-2 ml-1">{t('bharti')}</Text>
                                 <TextInput
                                     className={`bg-gray-50 p-4 rounded-xl text-xl border border-gray-200 focus:border-brand-gold ${Platform.OS === 'web' ? 'outline-none' : ''}`}
                                     keyboardType="numeric"
@@ -294,7 +297,7 @@ const PurchaseScreen = () => {
                             </View>
                         </View>
 
-                        <Text className="text-brand-navy font-bold mb-2 ml-1">Rate (₹/Quintal)</Text>
+                        <Text className="text-brand-navy font-bold mb-2 ml-1">{t('rate')} (₹/Qtl)</Text>
                         <TextInput
                             className={`bg-gray-50 p-4 rounded-xl mb-6 text-xl border border-gray-200 focus:border-brand-gold ${Platform.OS === 'web' ? 'outline-none' : ''}`}
                             keyboardType="numeric"
@@ -303,7 +306,7 @@ const PurchaseScreen = () => {
                             onChangeText={setRate}
                         />
 
-                        <Text className="text-brand-navy font-bold mb-2 ml-1">Labour Cost / Bag (Palledari)</Text>
+                        <Text className="text-brand-navy font-bold mb-2 ml-1">{t('labourCost')} / {t('bags')}</Text>
                         <TextInput
                             className={`bg-gray-50 p-4 rounded-xl mb-6 text-xl border border-gray-200 focus:border-brand-gold ${Platform.OS === 'web' ? 'outline-none' : ''}`}
                             keyboardType="numeric"
@@ -314,7 +317,7 @@ const PurchaseScreen = () => {
 
                         <View className="bg-brand-navy p-5 rounded-xl mb-6 shadow-lg">
                             <View className="flex-row justify-between mb-2">
-                                <Text className="text-gray-300">Total Weight</Text>
+                                <Text className="text-gray-300">{t('totalWeight')}</Text>
                                 <View className="items-end">
                                     <Text className="text-white font-bold text-lg">{totalWeightKg} kg</Text>
                                     <Text className="text-gray-400 text-xs">({totalWeightQtl} Quintal)</Text>
@@ -322,7 +325,7 @@ const PurchaseScreen = () => {
                             </View>
                             <View className="h-[1px] bg-gray-600 my-2" />
                             <View className="flex-row justify-between items-center">
-                                <Text className="text-gray-300">Total Amount</Text>
+                                <Text className="text-gray-300">{t('totalAmount')}</Text>
                                 <Text className="text-white font-bold text-2xl text-brand-gold">₹ {totalPrice}</Text>
                             </View>
                         </View>
@@ -331,7 +334,7 @@ const PurchaseScreen = () => {
                             className="bg-brand-gold p-4 rounded-xl items-center shadow-md active:opacity-90"
                             onPress={handlePurchase}
                         >
-                            <Text className="text-brand-navy text-xl font-bold">Record Purchase</Text>
+                            <Text className="text-brand-navy text-xl font-bold">{t('recordPurchase')}</Text>
                         </TouchableOpacity>
                     </View>
                 </ScrollView>

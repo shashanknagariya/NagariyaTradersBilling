@@ -6,6 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import "./global.css"
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { LanguageProvider } from './src/context/LanguageContext';
 
 // Screens
 import LoginScreen from './src/screens/LoginScreen';
@@ -49,9 +50,11 @@ const AppNav = () => {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <AppNav />
-      </AuthProvider>
+      <LanguageProvider>
+        <AuthProvider>
+          <AppNav />
+        </AuthProvider>
+      </LanguageProvider>
     </SafeAreaProvider>
   );
 }

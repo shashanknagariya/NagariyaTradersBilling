@@ -1,0 +1,240 @@
+export const translations = {
+    en: {
+        // Home
+        dashboard: "Dashboard",
+        financialOverview: "Financial Overview",
+        toReceive: "To Receive",
+        toPay: "To Pay",
+        inventoryValue: "Inventory Value",
+        quickActions: "Quick Actions",
+        purchase: "Purchase",
+        newSale: "New Sale",
+        inventory: "Inventory",
+        reports: "Reports",
+        users: "Users",
+        logout: "Logout",
+        welcome: "Welcome",
+
+        // Common
+        all: "All",
+        none: "None",
+        grain: "Grain",
+        party: "Party",
+        sale: "Sale",
+        partial: "Partial",
+
+        date: "Date",
+        submit: "Submit",
+        cancel: "Cancel",
+        close: "Close",
+        loading: "Loading...",
+        error: "Error",
+        success: "Success",
+        notes: "Notes",
+        save: "Save",
+        delete: "Delete",
+        edit: "Edit",
+
+        // Purchase/Sale Form
+        selectGrain: "Select Grain",
+        supplier: "Supplier",
+        buyer: "Buyer",
+        warehouse: "Warehouse",
+        selectWarehouse: "Select Warehouse",
+        storageLocation: "Storage Location",
+        bags: "Bags",
+        bharti: "Bharti (kg/bag)",
+        rate: "Rate",
+        totalWeight: "Total Weight",
+        totalAmount: "Total Amount",
+        recordPurchase: "Record Purchase",
+        generateBill: "Generate Bill",
+        gst: "GST",
+        grandTotal: "Grand Total",
+
+        // Costs
+        labourCost: "Labour", // Short for Labour Cost
+        transportCost: "Transport",
+        vehicleNo: "Vehicle No",
+        driverName: "Driver Name",
+        destination: "Destination",
+
+        // Inventory
+        stock: "Stock",
+        avgPrice: "Avg Price",
+        value: "Value",
+
+        // Reports
+        transactions: "Transactions",
+        analytics: "Analytics",
+        profit: "Profit",
+        received: "Received",
+        paid: "Paid",
+        pending: "Pending",
+
+        // Edit Screen
+        editSale: "Edit Sale",
+        editPurchase: "Edit Purchase",
+        items: "Items",
+        noOfBags: "No. of Bags",
+        quantityQtl: "Quantity (Qtl)",
+        ratePerQtl: "Rate (₹/Qtl)",
+        costDetails: "Cost Details",
+        labourCostPerBag: "Labour Cost / Bag",
+        transportCostPerQtl: "Transport Cost / Qtl",
+        dispatchDetails: "Dispatch Details",
+        saveChanges: "Save Changes",
+        transactionUpdated: "Transaction Updated",
+        failedToUpdate: "Failed to update",
+
+        // Reports Extra
+        filters: "Filters",
+        clear: "Clear All",
+        status: "Status",
+        dateRange: "Date Range",
+        startDate: "Start Date",
+        endDate: "End Date",
+        apply: "Apply",
+        invoice: "Inv",
+        payReceive: "Pay / Receive",
+        reportSettings: "Report Settings",
+        groupBy: "Group By",
+        downloadCsv: "Download CSV",
+        recordPayment: "Record Payment",
+        paidSoFar: "Paid So Far",
+        pendingAmount: "Pending Amount",
+        amountPaying: "Amount Paying",
+        confirmPayment: "Confirm Payment",
+        total: "Total",
+
+        // Table Headers
+        groupName: "Group Name",
+        count: "Count",
+        gross: "Gross",
+        short: "Short",
+        ded: "Ded.",
+        lab: "Lab.",
+        trans: "Trans.",
+        net: "Net",
+        avgCost: "Avg Cost"
+    },
+    hi: {
+        // Home
+        dashboard: "होम", // Home is shorter/simpler than Dashboard
+        financialOverview: "लेखा जोखा", // Accounts/Overview
+        toReceive: "लेना है", // Has to take
+        toPay: "देना है", // Has to give
+        inventoryValue: "स्टॉक वैल्यू",
+        quickActions: "काम", // Works/Actions
+        purchase: "खरीद",
+        newSale: "बिक्री",
+        inventory: "स्टॉक", // Stock is commonly used
+        reports: "रिपोर्ट",
+        users: "यूज़र्स",
+        logout: "लॉग आउट",
+        welcome: "स्वागत",
+
+        // Common
+        all: "सभी",
+        none: "कोई नहीं",
+        grain: "अनाज",
+        party: "पार्टी",
+        sale: "बिक्री",
+        partial: "आंशिक",
+
+        date: "दिनांक",
+        submit: "जमा करें",
+        cancel: "रद्द",
+        close: "बंद",
+        loading: "लोड हो रहा है...",
+        error: "त्रुटि",
+        success: "सफल",
+        notes: "विवरण", // Details/Notes
+        save: "सेव",
+        delete: "हटाएं",
+        edit: "सुधारें", // Edit/Correct
+
+        // Purchase/Sale Form
+        selectGrain: "अनाज चुनें",
+        supplier: "व्यापारी", // Merchant/Supplier
+        buyer: "खरीदार",
+        warehouse: "गोदाम",
+        selectWarehouse: "गोदाम चुनें",
+        storageLocation: "गोदाम",
+        bags: "कट्टे", // Bags
+        bharti: "भरती", // Filling/Bharti
+        rate: "भाव", // Rate/Price
+        totalWeight: "कुल वजन",
+        totalAmount: "कुल रकम",
+        recordPurchase: "खरीद लिखें",
+        generateBill: "बिल बनाएं",
+        gst: "GST",
+        grandTotal: "कुल योग",
+
+        // Costs
+        labourCost: "पल्लेदारी", // Palledari is the specific term used in mandate
+        transportCost: "भाड़ा", // Bhada (Freight/Transport)
+        vehicleNo: "गाड़ी नंबर",
+        driverName: "ड्राइवर",
+        destination: "जगह", // Place/Destination
+
+        // Inventory
+        stock: "स्टॉक",
+        avgPrice: "औसत भाव",
+        value: "मूल्य",
+
+        // Reports
+        transactions: "लेन-देन",
+        analytics: "हिसाब",
+        profit: "मुनाफा",
+        received: "प्राप्त", // Received
+        paid: "दिए", // Given/Paid
+        pending: "बाकी", // Remaining/Pending
+
+        // Edit Screen
+        editSale: "बिक्री सुधारें",
+        editPurchase: "खरीद सुधारें",
+        items: "सामान",
+        noOfBags: "कट्टे",
+        quantityQtl: "वजन (क्विंटल)",
+        ratePerQtl: "भाव (₹/क्विंटल)",
+        costDetails: "खर्चे",
+        labourCostPerBag: "मज़दूरी / कट्टा",
+        transportCostPerQtl: "भाड़ा / क्विंटल",
+        dispatchDetails: "गाड़ी विवरण",
+        saveChanges: "सुधारें",
+        transactionUpdated: "लेन-देन सुधर गया",
+        failedToUpdate: "सुधार नहीं हो पाया",
+
+        // Reports Extra
+        filters: "फिल्टर",
+        clear: "साफ़ करें",
+        status: "स्थिति",
+        dateRange: "दिनांक सीमा",
+        startDate: "शुरू दिनांक",
+        endDate: "अंतिम दिनांक",
+        apply: "लागू करें",
+        invoice: "बिल #",
+        payReceive: "भुगतान",
+        reportSettings: "रिपोर्ट सेटिंग",
+        groupBy: "ग्रुप करें",
+        downloadCsv: "CSV डाउनलोड",
+        recordPayment: "भुगतान लिखें",
+        paidSoFar: "अब तक दिया",
+        pendingAmount: "बकाया राशि",
+        amountPaying: "अब दे रहे हैं",
+        confirmPayment: "पुष्टि करें",
+        total: "कुल",
+
+        // Table Headers
+        groupName: "नाम",
+        count: "गिनती",
+        gross: "कुल",
+        short: "कम", // Shortage
+        ded: "काट", // Deduction
+        lab: "मज़दूरी", // Labour
+        trans: "भाड़ा", // Transport
+        net: "शुद्ध", // Net
+        avgCost: "लागत"
+    }
+};

@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, Modal, FlatList, Platform, KeyboardAvoidingView } from 'react-native';
 import client from '../api/client';
 import { useNavigation } from '@react-navigation/native';
+import { useLanguage } from '../context/LanguageContext';
 
 const SalesScreen = () => {
     const navigation = useNavigation();
+    const { t } = useLanguage();
 
     // Master Data
     const [grains, setGrains] = useState([]);
@@ -163,7 +165,7 @@ const SalesScreen = () => {
                     <TouchableOpacity onPress={() => navigation.goBack()} className="mr-4">
                         <Text className="text-white text-2xl">←</Text>
                     </TouchableOpacity>
-                    <Text className="text-2xl font-bold text-white">New Sale (Bill)</Text>
+                    <Text className="text-2xl font-bold text-white">{t('newSale')}</Text>
                 </View>
             </View>
 
@@ -200,6 +202,7 @@ const SalesScreen = () => {
                         type="date"
                         value={date}
                         onChange={(e) => setDate(e.target.value)}
+                        onClick={(e) => e.target.showPicker()}
                         style={{
                             padding: 12,
                             borderRadius: 8,
@@ -234,38 +237,38 @@ const SalesScreen = () => {
 
                 {/* 2. Grain */}
                 <Dropdown
-                    label="Grain"
+                    label={t('selectGrain')}
                     value={selectedGrain?.name}
-                    placeholder="Select Grain"
+                    placeholder={t('selectGrain')}
                     onPress={() => setIsGrainModalOpen(true)}
                 />
 
                 {/* 3. Loading Warehouse (Multi-select) */}
-                <Text className="text-brand-navy font-bold mb-2 ml-1">Loading From (Warehouses)</Text>
+                <Text className="text-brand-navy font-bold mb-2 ml-1">{t('storageLocation')} ({t('selectWarehouse')})</Text>
                 <TouchableOpacity
                     className="bg-brand-navy/5 p-4 rounded-xl border border-brand-navy/10 mb-2"
                     onPress={() => setIsAllocationModalOpen(true)}
                 >
                     <Text className="text-brand-navy font-semibold text-center">
-                        {totalBags > 0 ? `${Object.keys(allocations).filter(k => allocations[k] > 0).length} Warehouses Selected` : "Select Warehouses & Bags"}
+                        {totalBags > 0 ? `${Object.keys(allocations).filter(k => allocations[k] > 0).length} ${t('warehouse')} Selected` : t('selectWarehouse')}
                     </Text>
                 </TouchableOpacity>
-                <Text className="text-right text-brand-gold font-bold mb-4">Total Bags: {totalBags}</Text>
+                <Text className="text-right text-brand-gold font-bold mb-4">{t('bags')}: {totalBags}</Text>
 
                 {/* 4. Weight & Rate */}
                 <View className="flex-row justify-between">
                     <View className="w-[48%]">
-                        <LabeledInput label="Bharti (kg/bag)" value={bharti} onChange={setBharti} keyboardType="numeric" />
+                        <LabeledInput label={t('bharti')} value={bharti} onChange={setBharti} keyboardType="numeric" />
                     </View>
                     <View className="w-[48%]">
-                        <Text className="text-brand-navy font-bold mb-2 ml-1">Est. Weight (Qtl)</Text>
+                        <Text className="text-brand-navy font-bold mb-2 ml-1">{t('totalWeight')} (Qtl)</Text>
                         <View className="bg-gray-100 p-4 rounded-xl border border-gray-200">
                             <Text className="text-lg text-gray-600">{totalWeightQtl.toFixed(2)}</Text>
                         </View>
                     </View>
                 </View>
 
-                <LabeledInput label="Rate (₹/Quintal)" value={rate} onChange={setRate} keyboardType="numeric" placeholder="0.00" />
+                <LabeledInput label={`${t('rate')} (₹/Qtl)`} value={rate} onChange={setRate} keyboardType="numeric" placeholder="0.00" />
 
                 {/* 5. Payment Details */}
                 <View className="bg-brand-navy p-5 rounded-xl mb-6 shadow-lg">
@@ -274,7 +277,7 @@ const SalesScreen = () => {
                         <Text className="text-white font-bold">₹ {subTotal.toFixed(2)}</Text>
                     </View>
                     <View className="flex-row justify-between items-center mb-2">
-                        <Text className="text-gray-300">GST (%)</Text>
+                        <Text className="text-gray-300">{t('gst')} (%)</Text>
                         <TextInput
                             className="bg-white/10 text-white p-1 px-3 rounded text-right w-16"
                             value={gstRate}
@@ -283,24 +286,24 @@ const SalesScreen = () => {
                         />
                     </View>
                     <View className="flex-row justify-between mb-2">
-                        <Text className="text-gray-300">GST Amount</Text>
+                        <Text className="text-gray-300">{t('gst')} Amount</Text>
                         <Text className="text-white">₹ {gstAmount.toFixed(2)}</Text>
                     </View>
                     <View className="h-[1px] bg-gray-600 my-2" />
                     <View className="flex-row justify-between items-center">
-                        <Text className="text-brand-gold font-bold text-lg">Grand Total</Text>
+                        <Text className="text-brand-gold font-bold text-lg">{t('grandTotal')}</Text>
                         <Text className="text-brand-gold font-bold text-2xl">₹ {grandTotal.toFixed(2)}</Text>
                     </View>
                 </View>
 
                 {/* 5.5 Hidden Costs (Internal) */}
-                <Text className="text-xl font-bold text-gray-400 mb-4 border-b border-gray-100 pb-2 mt-4">Internal Costs (Profit calc)</Text>
+                <Text className="text-xl font-bold text-gray-400 mb-4 border-b border-gray-100 pb-2 mt-4">Internal Costs ({t('profit')} calc)</Text>
                 <View className="flex-row justify-between">
                     <View className="w-[48%]">
-                        <LabeledInput label="Labour / Bag" value={labourCost} onChange={setLabourCost} keyboardType="numeric" placeholder="3.00" />
+                        <LabeledInput label={`${t('labourCost')} / ${t('bags')}`} value={labourCost} onChange={setLabourCost} keyboardType="numeric" placeholder="3.00" />
                     </View>
                     <View className="w-[48%]">
-                        <LabeledInput label="Transport / Qtl" value={transportCost} onChange={setTransportCost} keyboardType="numeric" placeholder="0.00" />
+                        <LabeledInput label={`${t('transportCost')} / Qtl`} value={transportCost} onChange={setTransportCost} keyboardType="numeric" placeholder="0.00" />
                     </View>
                 </View>
 
@@ -309,19 +312,19 @@ const SalesScreen = () => {
                 <LabeledInput label="Transporter Name" value={transporter} onChange={setTransporter} placeholder="Transporter Name" />
                 <View className="flex-row justify-between">
                     <View className="w-[48%]">
-                        <LabeledInput label="Vehicle No" value={vehicleNo} onChange={setVehicleNo} placeholder="HR-XX-XXXX" />
+                        <LabeledInput label={t('vehicleNo')} value={vehicleNo} onChange={setVehicleNo} placeholder="HR-XX-XXXX" />
                     </View>
                     <View className="w-[48%]">
-                        <LabeledInput label="Driver Name" value={driverName} onChange={setDriverName} placeholder="Driver Name" />
+                        <LabeledInput label={t('driverName')} value={driverName} onChange={setDriverName} placeholder="Driver Name" />
                     </View>
                 </View>
-                <LabeledInput label="Destination" value={destination} onChange={setDestination} placeholder="City/State" />
+                <LabeledInput label={t('destination')} value={destination} onChange={setDestination} placeholder="City/State" />
 
                 <TouchableOpacity
                     className="bg-brand-gold p-4 rounded-xl items-center shadow-md active:opacity-90 mt-4"
                     onPress={handleSale}
                 >
-                    <Text className="text-brand-navy text-xl font-bold">Generate Bill</Text>
+                    <Text className="text-brand-navy text-xl font-bold">{t('generateBill')}</Text>
                 </TouchableOpacity>
 
             </View>

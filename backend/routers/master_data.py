@@ -2,7 +2,16 @@ from fastapi import APIRouter, Depends
 from sqlmodel import Session, select
 from database import get_session
 from models import Grain, Warehouse, Contact
+from models import Grain, Warehouse, Contact
 from typing import List
+import os
+from pydantic import BaseModel
+
+class BankDetails(BaseModel):
+    bank_name: str
+    account_no: str
+    ifsc: str
+    holder_name: str
 
 router = APIRouter(prefix="/master", tags=["master"])
 
@@ -44,3 +53,13 @@ def create_contact(contact: Contact, session: Session = Depends(get_session)):
 def read_contacts(session: Session = Depends(get_session)):
     contacts = session.exec(select(Contact)).all()
     return contacts
+
+# BANK DETAILS
+@router.get("/bank-details", response_model=BankDetails)
+def get_bank_details():
+    return BankDetails(
+        bank_name=os.getenv("BANK_NAME", ""),
+        account_no=os.getenv("BANK_ACCOUNT_NO", ""),
+        ifsc=os.getenv("BANK_IFSC", ""),
+        holder_name=os.getenv("BANK_HOLDER_NAME", "")
+    )

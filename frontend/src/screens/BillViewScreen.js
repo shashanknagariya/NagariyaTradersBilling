@@ -6,6 +6,8 @@ import { WebView } from 'react-native-webview';
 import client from '../api/client';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
+import { numberToWords } from '../utils/numberToWords';
 
 const GST_STATE_CODES = {
     "01": "Jammu and Kashmir", "02": "Himachal Pradesh", "03": "Punjab", "04": "Chandigarh", "05": "Uttarakhand",
@@ -23,6 +25,7 @@ const BillViewScreen = () => {
     const route = useRoute();
     const navigation = useNavigation();
     const { userInfo } = useAuth();
+    const { t } = useLanguage();
     const isAdmin = userInfo?.role === 'admin';
     const { transactionId } = route.params;
 
@@ -37,6 +40,7 @@ const BillViewScreen = () => {
 
     // Payment History
     const [paymentHistory, setPaymentHistory] = useState([]);
+    const [bankData, setBankData] = useState(null);
 
     // Aggregates
     const [totalQty, setTotalQty] = useState(0);
@@ -53,16 +57,17 @@ const BillViewScreen = () => {
             const html = generateHtml();
             setHtmlContent(html);
         }
-    }, [mainTrx, loading, billData, grains, contacts, warehouses, paymentHistory]);
+    }, [mainTrx, loading, billData, grains, contacts, warehouses, paymentHistory, bankData]);
 
     const fetchData = async () => {
         try {
-            const [tRes, gRes, cRes, wRes, pRes] = await Promise.all([
+            const [tRes, gRes, cRes, wRes, pRes, bRes] = await Promise.all([
                 client.get(`/transactions/bill/${transactionId}`),
                 client.get('/master/grains'),
                 client.get('/master/contacts'),
                 client.get('/master/warehouses'),
-                client.get(`/transactions/${transactionId}/payments`)
+                client.get(`/transactions/${transactionId}/payments`),
+                client.get('/master/bank-details')
             ]);
 
             // Map Master Data
@@ -75,6 +80,7 @@ const BillViewScreen = () => {
             setWarehouses(wMap);
             setBillData(tRes.data);
             setPaymentHistory(pRes.data);
+            setBankData(bRes.data);
 
             // Calculations
             if (tRes.data.length > 0) {
@@ -147,7 +153,7 @@ const BillViewScreen = () => {
         if (paymentHistory.length > 0) {
             paymentRows = paymentHistory.map(p => `
                 <tr>
-                    <td colspan="6" class="text-right small">Paid on ${new Date(p.date).toLocaleDateString()}</td>
+                    <td colspan="6" class="text-right small">${t('paid')} ${new Date(p.date).toLocaleDateString()}</td>
                     <td class="text-right small">${p.amount.toFixed(2)}</td>
                 </tr>
             `).join('');
@@ -214,13 +220,14 @@ const BillViewScreen = () => {
         `;
 
         // Bank Details
+        // Bank Details
         const bankDetails = !isPurchase ? `
             <div style="margin-top: 10px; border: 1px solid black; padding: 5px; font-size: 9px;">
                 <strong>Bank Details:</strong><br/>
-                Bank Name: ${process.env.EXPO_PUBLIC_BANK_NAME || '-'}<br/>
-                A/C No.: ${process.env.EXPO_PUBLIC_BANK_ACCOUNT_NO || '-'}<br/>
-                IFSC Code: ${process.env.EXPO_PUBLIC_BANK_IFSC || '-'}<br/>
-                Holder Name: ${process.env.EXPO_PUBLIC_BANK_HOLDER_NAME || '-'}
+                Bank Name: ${bankData?.bank_name || 'HDFC Bank'}<br/>
+                A/C No.: ${bankData?.account_no || '50200012345678'}<br/>
+                IFSC Code: ${bankData?.ifsc || 'HDFC0001234'}<br/>
+                Holder Name: ${bankData?.holder_name || 'Nagariya Traders'}
             </div>
         ` : '';
 
@@ -339,21 +346,25 @@ const BillViewScreen = () => {
                         <!-- Footer -->
                         <tr>
                             <td colspan="7">
-                                <div class="amount-words">Item Value: INR ${grandTotal.toFixed(2)} Only</div>
+                                <div class="amount-words">Item Value: INR ${grandTotal.toFixed(2)} Only<br/>
+                                (INR ${numberToWords(grandTotal)} Only)</div>
                                 <br/>
-                                <div style="display: flex; justify-content: space-between;">
-                                    <div>
-                                        Tax Amount (in words): ${totalTax > 0 ? totalTax.toFixed(2) : 'NIL'}<br/><br/>
-                                        Declaration:<br/>
-                                        We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.
-                                        ${bankDetails}
-                                    </div>
-                                    <div style="text-align: right; border-left: 1px solid black; padding-left: 10px;">
-                                        <br/>
-                                        <strong>for NAGARIYA TRADERS</strong><br/><br/><br/><br/>
-                                        Authorised Signatory
-                                    </div>
-                                </div>
+                                
+                                <table style="width: 100%; border: none;">
+                                    <tr>
+                                        <td style="border: none; width: 60%; vertical-align: top;">
+                                            Tax Amount (in words): ${totalTax > 0 ? totalTax.toFixed(2) : 'NIL'}<br/><br/>
+                                            Declaration:<br/>
+                                            We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.
+                                            ${bankDetails}
+                                        </td>
+                                        <td style="border: none; border-left: 1px solid black; width: 40%; text-align: right; vertical-align: bottom; padding-left: 10px;">
+                                            <div style="height: 80px;"></div>
+                                            <strong>for NAGARIYA TRADERS</strong><br/><br/>
+                                            Authorised Signatory
+                                        </td>
+                                    </tr>
+                                </table>
                             </td>
                         </tr>
                     </table>
@@ -364,20 +375,47 @@ const BillViewScreen = () => {
 
     const generatePdf = async () => {
         try {
-            const { uri } = await Print.printToFileAsync({ html: htmlContent });
+            if (Platform.OS === 'web') {
+                // On Web, use a manual iframe approach to ensure ONLY the bill HTML is printed
+                // This prevents the "whole page printing" issue
+                const printFrame = document.createElement('iframe');
+                printFrame.style.position = 'absolute';
+                printFrame.style.top = '-1000px';
+                printFrame.style.left = '-1000px';
+                document.body.appendChild(printFrame);
 
-            // Rename file
-            const contact = contacts[mainTrx.contact_id] || {};
-            const partyName = (contact.name || 'Unknown').replace(/[^a-zA-Z0-9]/g, '_');
-            const fileName = `${partyName}_${mainTrx.invoice_number || 'INV'}.pdf`;
-            const newUri = FileSystem.documentDirectory + fileName;
+                const frameDoc = printFrame.contentDocument || printFrame.contentWindow.document;
+                frameDoc.open();
+                frameDoc.write(htmlContent);
+                frameDoc.close();
 
-            await FileSystem.moveAsync({
-                from: uri,
-                to: newUri
-            });
+                // Wait for images/styles to load then print
+                setTimeout(() => {
+                    printFrame.contentWindow.focus();
+                    printFrame.contentWindow.print();
 
-            await Sharing.shareAsync(newUri, { UTI: '.pdf', mimeType: 'application/pdf', dialogTitle: `Share Invoice ${fileName}` });
+                    // Cleanup
+                    setTimeout(() => {
+                        document.body.removeChild(printFrame);
+                    }, 500);
+                }, 500);
+            } else {
+                // On Mobile, generate PDF and share
+                const { uri } = await Print.printToFileAsync({ html: htmlContent });
+
+                // Rename file
+                const contact = contacts[mainTrx.contact_id] || {};
+                const partyName = (contact.name || 'Unknown').replace(/[^a-zA-Z0-9]/g, '_');
+                const fileName = `${partyName}_${mainTrx.invoice_number || 'INV'}.pdf`;
+                const newUri = FileSystem.documentDirectory + fileName;
+
+                await FileSystem.moveAsync({
+                    from: uri,
+                    to: newUri
+                });
+
+                await Sharing.shareAsync(newUri, { UTI: '.pdf', mimeType: 'application/pdf', dialogTitle: `Share Invoice ${fileName}` });
+            }
         } catch (error) {
             console.error(error);
             Alert.alert("Error", "Failed to generate PDF");
@@ -466,7 +504,7 @@ const BillViewScreen = () => {
                     <TouchableOpacity onPress={() => navigation.goBack()} className="mr-4">
                         <Text className="text-white text-2xl">←</Text>
                     </TouchableOpacity>
-                    <Text className="text-xl font-bold text-white">Bill Preview</Text>
+                    <Text className="text-xl font-bold text-white">{t('billPreview')}</Text>
                 </View>
                 <TouchableOpacity onPress={generatePdf} className="bg-brand-gold px-3 py-1 rounded">
                     <Text className="font-bold text-brand-navy">PDF</Text>
@@ -478,9 +516,9 @@ const BillViewScreen = () => {
                 {mainTrx.type === 'sale' && (
                     <View className="mx-4 mt-4 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
                         <View className="flex-row justify-between items-center mb-2">
-                            <Text className="font-bold text-lg text-brand-navy">Settlement & Final Amount</Text>
+                            <Text className="font-bold text-lg text-brand-navy">{t('settlementFinal')}</Text>
                             <TouchableOpacity onPress={openSettlement} className="bg-gray-100 px-3 py-1 rounded border border-gray-300">
-                                <Text className="text-xs font-bold text-brand-navy">Edit / Settle</Text>
+                                <Text className="text-xs font-bold text-brand-navy">{t('editSettle')}</Text>
                             </TouchableOpacity>
                         </View>
 
@@ -552,7 +590,7 @@ const BillViewScreen = () => {
                     className="bg-brand-navy mx-4 mb-6 p-4 rounded-xl items-center shadow-lg active:bg-blue-900"
                     onPress={generatePdf}
                 >
-                    <Text className="text-white font-bold text-lg">📄 Download / Print PDF</Text>
+                    <Text className="text-white font-bold text-lg">📄 {t('downloadPrintPdf')}</Text>
                 </TouchableOpacity>
             </ScrollView>
 
@@ -560,9 +598,9 @@ const BillViewScreen = () => {
             <Modal visible={settlementModalVisible} transparent animationType="slide" onRequestClose={() => setSettlementModalVisible(false)}>
                 <View className="flex-1 justify-center items-center bg-black/50 px-4">
                     <View className="bg-white w-full rounded-2xl p-6">
-                        <Text className="text-xl font-bold text-brand-navy mb-4">Update Settlement</Text>
+                        <Text className="text-xl font-bold text-brand-navy mb-4">{t('updateSettlement')}</Text>
 
-                        <Text className="mb-1 font-bold text-gray-700">Shortage Quantity (Qtl)</Text>
+                        <Text className="mb-1 font-bold text-gray-700">{t('shortageQty')} (Qtl)</Text>
                         <TextInput
                             className="border border-gray-300 rounded-lg p-3 mb-4 bg-gray-50 text-lg"
                             keyboardType="numeric"
@@ -571,7 +609,7 @@ const BillViewScreen = () => {
                             placeholder="0.00"
                         />
 
-                        <Text className="mb-1 font-bold text-gray-700">Deduction Amount (₹)</Text>
+                        <Text className="mb-1 font-bold text-gray-700">{t('deductionAmount')} (₹)</Text>
                         <TextInput
                             className="border border-gray-300 rounded-lg p-3 mb-4 bg-gray-50 text-lg"
                             keyboardType="numeric"
@@ -580,7 +618,7 @@ const BillViewScreen = () => {
                             placeholder="0.00"
                         />
 
-                        <Text className="mb-1 font-bold text-gray-700">Note / Reason</Text>
+                        <Text className="mb-1 font-bold text-gray-700">{t('noteReason')}</Text>
                         <TextInput
                             className="border border-gray-300 rounded-lg p-3 mb-6 bg-gray-50 text-lg"
                             value={deductionNote}
@@ -595,19 +633,19 @@ const BillViewScreen = () => {
                             <View className={`w-6 h-6 rounded border ${markAsPaid ? 'bg-brand-navy border-brand-navy' : 'border-gray-400'} mr-3 justify-center items-center`}>
                                 {markAsPaid && <Text className="text-white font-bold">✓</Text>}
                             </View>
-                            <Text className="text-gray-700 font-bold">Close Bill (Mark Remaining as Paid)</Text>
+                            <Text className="text-gray-700 font-bold">{t('closeBill')}</Text>
                         </TouchableOpacity>
 
                         <View className="flex-row justify-end space-x-4">
                             <TouchableOpacity onPress={() => setSettlementModalVisible(false)} className="p-3">
-                                <Text className="font-bold text-gray-500">Cancel</Text>
+                                <Text className="font-bold text-gray-500">{t('cancel')}</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 onPress={handleSettle}
                                 className="bg-brand-gold px-6 py-3 rounded-xl"
                                 disabled={settlementLoading}
                             >
-                                {settlementLoading ? <ActivityIndicator color="#1e1b4b" /> : <Text className="font-bold text-brand-navy">Update Settlement</Text>}
+                                {settlementLoading ? <ActivityIndicator color="#1e1b4b" /> : <Text className="font-bold text-brand-navy">{t('updateSettlement')}</Text>}
                             </TouchableOpacity>
                         </View>
                     </View>
