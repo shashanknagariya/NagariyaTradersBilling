@@ -93,7 +93,7 @@ const PurchaseScreen = () => {
 
     const handleCreateContact = async () => {
         if (!newContactName.trim()) {
-            Alert.alert("Error", "Name is required");
+            Alert.alert(t('error'), t('reqName'));
             return;
         }
         try {
@@ -116,7 +116,7 @@ const PurchaseScreen = () => {
 
     const handleCreateGrain = async () => {
         if (!newGrainName.trim()) {
-            Alert.alert("Error", "Name is required");
+            Alert.alert(t('error'), t('reqName'));
             return;
         }
         try {
@@ -137,7 +137,7 @@ const PurchaseScreen = () => {
 
     const handleCreateWarehouse = async () => {
         if (!newWarehouseName.trim()) {
-            Alert.alert("Error", "Name is required");
+            Alert.alert(t('error'), t('reqName'));
             return;
         }
         try {
@@ -158,7 +158,7 @@ const PurchaseScreen = () => {
 
     const handlePurchase = async () => {
         if (!selectedGrain || !selectedWarehouse || !selectedContact || !numBags || !rate) {
-            Alert.alert("Error", "Please fill all fields");
+            Alert.alert(t('error'), t('fillAll'));
             return;
         }
 
@@ -178,17 +178,17 @@ const PurchaseScreen = () => {
                 labour_cost_per_bag: parseFloat(labourCost) || 0
             });
             if (Platform.OS === 'web') {
-                alert("Success: Purchase Recorded!");
+                alert(t('success') + ": " + t('recordSuccess'));
                 navigation.navigate('Home');
             } else {
-                Alert.alert("Success", "Purchase Recorded!", [
+                Alert.alert(t('success'), t('recordSuccess'), [
                     { text: "OK", onPress: () => navigation.navigate('Home') }
                 ]);
             }
             setNumBags('');
             setRate('');
         } catch (e) {
-            Alert.alert("Error", "Failed to record purchase");
+            Alert.alert(t('error'), t('failedRecord'));
         }
     };
 
@@ -351,29 +351,29 @@ const PurchaseScreen = () => {
                     >
                         <View className="bg-white p-6 rounded-2xl shadow-sm">
                             <Dropdown
-                                label="Select Grain"
+                                label={t('selectGrain')}
                                 value={selectedGrain?.name}
-                                placeholder="Choose Grain..."
+                                placeholder={t('selectGrain')}
                                 onPress={() => setIsGrainModalOpen(true)}
                             />
 
                             <Dropdown
-                                label="Supplier (Person)"
+                                label={t('supplier')}
                                 value={selectedContact?.name}
-                                placeholder="Choose Supplier..."
+                                placeholder={t('supplier')}
                                 onPress={() => setIsContactModalOpen(true)}
                             />
 
                             <Dropdown
-                                label="Storage Location"
+                                label={t('storageLocation')}
                                 value={selectedWarehouse?.name}
-                                placeholder="Choose Warehouse..."
+                                placeholder={t('selectWarehouse')}
                                 onPress={() => setIsWarehouseModalOpen(true)}
                             />
 
                             <View className="flex-row justify-between mb-4">
                                 <View className="w-[48%]">
-                                    <Text className="text-brand-navy font-bold mb-2 ml-1">No. of Bags</Text>
+                                    <Text className="text-brand-navy font-bold mb-2 ml-1">{t('bags')}</Text>
                                     <TextInput
                                         className={`bg-gray-50 p-4 rounded-xl text-xl border border-gray-200 focus:border-brand-gold ${Platform.OS === 'web' ? 'outline-none' : ''}`}
                                         keyboardType="numeric"
@@ -383,7 +383,7 @@ const PurchaseScreen = () => {
                                     />
                                 </View>
                                 <View className="w-[48%]">
-                                    <Text className="text-brand-navy font-bold mb-2 ml-1">Bharti (kg/bag)</Text>
+                                    <Text className="text-brand-navy font-bold mb-2 ml-1">{t('bharti')}</Text>
                                     <TextInput
                                         className={`bg-gray-50 p-4 rounded-xl text-xl border border-gray-200 focus:border-brand-gold ${Platform.OS === 'web' ? 'outline-none' : ''}`}
                                         keyboardType="numeric"
@@ -394,7 +394,7 @@ const PurchaseScreen = () => {
                                 </View>
                             </View>
 
-                            <Text className="text-brand-navy font-bold mb-2 ml-1">Rate (₹/Quintal)</Text>
+                            <Text className="text-brand-navy font-bold mb-2 ml-1">{t('rate')} (₹/Qtl)</Text>
                             <TextInput
                                 className={`bg-gray-50 p-4 rounded-xl mb-6 text-xl border border-gray-200 focus:border-brand-gold ${Platform.OS === 'web' ? 'outline-none' : ''}`}
                                 keyboardType="numeric"
@@ -405,7 +405,7 @@ const PurchaseScreen = () => {
 
                             <View className="bg-brand-navy p-5 rounded-xl mb-6 shadow-lg">
                                 <View className="flex-row justify-between mb-2">
-                                    <Text className="text-gray-300">Total Weight</Text>
+                                    <Text className="text-gray-300">{t('totalWeight')}</Text>
                                     <View className="items-end">
                                         <Text className="text-white font-bold text-lg">{totalWeightKg} kg</Text>
                                         <Text className="text-gray-400 text-xs">({totalWeightQtl} Quintal)</Text>
@@ -413,7 +413,7 @@ const PurchaseScreen = () => {
                                 </View>
                                 <View className="h-[1px] bg-gray-600 my-2" />
                                 <View className="flex-row justify-between items-center">
-                                    <Text className="text-gray-300">Total Amount</Text>
+                                    <Text className="text-gray-300">{t('totalAmount')}</Text>
                                     <Text className="text-white font-bold text-2xl text-brand-gold">₹ {totalPrice}</Text>
                                 </View>
                             </View>
@@ -422,7 +422,7 @@ const PurchaseScreen = () => {
                                 className="bg-brand-gold p-4 rounded-xl items-center shadow-md active:opacity-90"
                                 onPress={handlePurchase}
                             >
-                                <Text className="text-brand-navy text-xl font-bold">Record Purchase</Text>
+                                <Text className="text-brand-navy text-xl font-bold">{t('recordPurchase')}</Text>
                             </TouchableOpacity>
                         </View>
                     </ScrollView>
@@ -436,10 +436,10 @@ const PurchaseScreen = () => {
                 <View className="flex-1 justify-end bg-black/50">
                     <View className="bg-white rounded-t-3xl p-6 h-[60%]">
                         <View className="flex-row justify-between items-center mb-4">
-                            <Text className="text-2xl font-bold text-brand-navy">Select Grain</Text>
+                            <Text className="text-2xl font-bold text-brand-navy">{t('selectGrain')}</Text>
                             {!isNewGrainMode && (
                                 <TouchableOpacity onPress={() => setIsNewGrainMode(true)} className="bg-brand-gold px-4 py-2 rounded-lg">
-                                    <Text className="text-brand-navy font-bold">+ New</Text>
+                                    <Text className="text-brand-navy font-bold">{t('addNew')}</Text>
                                 </TouchableOpacity>
                             )}
                         </View>
@@ -448,21 +448,21 @@ const PurchaseScreen = () => {
                             <View>
                                 <TextInput
                                     className="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-4"
-                                    placeholder="Grain Name (e.g. Wheat)"
+                                    placeholder={t('grainName') + " (e.g. Wheat)"}
                                     value={newGrainName}
                                     onChangeText={setNewGrainName}
                                 />
                                 <TextInput
                                     className="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-4"
-                                    placeholder="Hindi Name (e.g. Gehu)"
+                                    placeholder={t('hindiName') + " (e.g. Gehu)"}
                                     value={newGrainHindi}
                                     onChangeText={setNewGrainHindi}
                                 />
                                 <TouchableOpacity onPress={handleCreateGrain} className="bg-brand-navy p-4 rounded-xl items-center mb-2">
-                                    <Text className="text-white font-bold">Save Grain</Text>
+                                    <Text className="text-white font-bold">{t('saveGrain')}</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity onPress={() => setIsNewGrainMode(false)} className="p-4 items-center">
-                                    <Text className="text-gray-500">Cancel</Text>
+                                    <Text className="text-gray-500">{t('cancel')}</Text>
                                 </TouchableOpacity>
                             </View>
                         ) : (
@@ -477,7 +477,7 @@ const PurchaseScreen = () => {
                                     )}
                                 />
                                 <TouchableOpacity onPress={() => setIsGrainModalOpen(false)} className="mt-4 p-4 bg-gray-200 rounded-xl items-center">
-                                    <Text className="font-bold">Close</Text>
+                                    <Text className="font-bold">{t('close')}</Text>
                                 </TouchableOpacity>
                             </>
                         )}
@@ -490,10 +490,10 @@ const PurchaseScreen = () => {
                 <View className="flex-1 justify-end bg-black/50">
                     <View className="bg-white rounded-t-3xl p-6 h-[60%]">
                         <View className="flex-row justify-between items-center mb-4">
-                            <Text className="text-2xl font-bold text-brand-navy">Select Warehouse</Text>
+                            <Text className="text-2xl font-bold text-brand-navy">{t('selectWarehouse')}</Text>
                             {!isNewWarehouseMode && (
                                 <TouchableOpacity onPress={() => setIsNewWarehouseMode(true)} className="bg-brand-gold px-4 py-2 rounded-lg">
-                                    <Text className="text-brand-navy font-bold">+ New</Text>
+                                    <Text className="text-brand-navy font-bold">{t('addNew')}</Text>
                                 </TouchableOpacity>
                             )}
                         </View>
@@ -502,21 +502,21 @@ const PurchaseScreen = () => {
                             <View>
                                 <TextInput
                                     className="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-4"
-                                    placeholder="Warehouse Name"
+                                    placeholder={t('warehouse') + " Name"}
                                     value={newWarehouseName}
                                     onChangeText={setNewWarehouseName}
                                 />
                                 <TextInput
                                     className="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-4"
-                                    placeholder="Location (Optional)"
+                                    placeholder={t('location') + " (Optional)"}
                                     value={newWarehouseLoc}
                                     onChangeText={setNewWarehouseLoc}
                                 />
                                 <TouchableOpacity onPress={handleCreateWarehouse} className="bg-brand-navy p-4 rounded-xl items-center mb-2">
-                                    <Text className="text-white font-bold">Save Warehouse</Text>
+                                    <Text className="text-white font-bold">{t('saveWarehouse')}</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity onPress={() => setIsNewWarehouseMode(false)} className="p-4 items-center">
-                                    <Text className="text-gray-500">Cancel</Text>
+                                    <Text className="text-gray-500">{t('cancel')}</Text>
                                 </TouchableOpacity>
                             </View>
                         ) : (
@@ -531,7 +531,7 @@ const PurchaseScreen = () => {
                                     )}
                                 />
                                 <TouchableOpacity onPress={() => setIsWarehouseModalOpen(false)} className="mt-4 p-4 bg-gray-200 rounded-xl items-center">
-                                    <Text className="font-bold">Close</Text>
+                                    <Text className="font-bold">{t('close')}</Text>
                                 </TouchableOpacity>
                             </>
                         )}
@@ -544,10 +544,10 @@ const PurchaseScreen = () => {
                 <View className="flex-1 justify-end bg-black/50">
                     <View className="bg-white rounded-t-3xl p-6 h-[60%]">
                         <View className="flex-row justify-between items-center mb-4">
-                            <Text className="text-2xl font-bold text-brand-navy">Select Supplier</Text>
+                            <Text className="text-2xl font-bold text-brand-navy">{t('supplier')}</Text>
                             {!isNewContactMode && (
                                 <TouchableOpacity onPress={() => setIsNewContactMode(true)} className="bg-brand-gold px-4 py-2 rounded-lg">
-                                    <Text className="text-brand-navy font-bold">+ New</Text>
+                                    <Text className="text-brand-navy font-bold">{t('addNew')}</Text>
                                 </TouchableOpacity>
                             )}
                         </View>
@@ -556,15 +556,15 @@ const PurchaseScreen = () => {
                             <View>
                                 <TextInput
                                     className="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-4"
-                                    placeholder="Enter Name"
+                                    placeholder={t('enterName')}
                                     value={newContactName}
                                     onChangeText={setNewContactName}
                                 />
                                 <TouchableOpacity onPress={handleCreateContact} className="bg-brand-navy p-4 rounded-xl items-center mb-2">
-                                    <Text className="text-white font-bold">Save Supplier</Text>
+                                    <Text className="text-white font-bold">{t('saveSupplier')}</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity onPress={() => setIsNewContactMode(false)} className="p-4 items-center">
-                                    <Text className="text-gray-500">Cancel</Text>
+                                    <Text className="text-gray-500">{t('cancel')}</Text>
                                 </TouchableOpacity>
                             </View>
                         ) : (
@@ -579,7 +579,7 @@ const PurchaseScreen = () => {
                                     )}
                                 />
                                 <TouchableOpacity onPress={() => setIsContactModalOpen(false)} className="mt-4 p-4 bg-gray-200 rounded-xl items-center">
-                                    <Text className="font-bold">Close</Text>
+                                    <Text className="font-bold">{t('close')}</Text>
                                 </TouchableOpacity>
                             </>
                         )}

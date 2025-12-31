@@ -76,7 +76,7 @@ const SalesScreen = () => {
 
     const handleCreateBuyer = async () => {
         if (!newBuyerName.trim()) {
-            Alert.alert("Error", "Name is required");
+            Alert.alert(t('error'), t('reqName'));
             return;
         }
         try {
@@ -92,13 +92,13 @@ const SalesScreen = () => {
             setNewBuyerName('');
             setNewBuyerGst('');
         } catch (e) {
-            Alert.alert("Error", "Failed to create buyer");
+            Alert.alert(t('error'), t('failedToUpdate'));
         }
     };
 
     const handleSale = async () => {
         if (!selectedGrain || !selectedBuyer || totalBags === 0 || !rate) {
-            Alert.alert("Error", "Please fill essential fields (Buyer, Grain, Warehouses, Rate)");
+            Alert.alert(t('error'), t('fillAll'));
             return;
         }
 
@@ -128,10 +128,10 @@ const SalesScreen = () => {
         try {
             await client.post('/transactions/bulk_sale', payload);
             if (Platform.OS === 'web') {
-                alert("Success: Bill Generated Successfully!");
+                alert(t('success') + ": " + t('saleSuccess'));
                 navigation.navigate('Home');
             } else {
-                Alert.alert("Success", "Bill Generated Successfully!", [
+                Alert.alert(t('success'), t('saleSuccess'), [
                     { text: "OK", onPress: () => navigation.navigate('Home') }
                 ]);
             }
@@ -144,8 +144,8 @@ const SalesScreen = () => {
             setDestination('');
         } catch (e) {
             console.error(e);
-            const msg = e.response?.data?.detail || "Failed to generate bill";
-            Alert.alert("Error", msg);
+            const msg = e.response?.data?.detail || t('failedRecord');
+            Alert.alert(t('error'), msg);
         }
     };
 
@@ -195,8 +195,7 @@ const SalesScreen = () => {
     function renderContent() {
         return (
             <View className="bg-white p-6 rounded-2xl shadow-sm">
-
-                <Text className="text-brand-navy font-bold mb-2 ml-1">Date</Text>
+                <Text className="text-brand-navy font-bold mb-2 ml-1">{t('date')}</Text>
                 {Platform.OS === 'web' ? (
                     <input
                         type="date"
@@ -224,15 +223,15 @@ const SalesScreen = () => {
                 )}
 
                 {/* 1. Party Details */}
-                <Text className="text-xl font-bold text-brand-navy mb-4 border-b border-gray-100 pb-2">Party Details</Text>
+                <Text className="text-xl font-bold text-brand-navy mb-4 border-b border-gray-100 pb-2">{t('party')}</Text>
                 <Dropdown
-                    label="Buyer Name"
+                    label={t('buyer')}
                     value={selectedBuyer?.name}
-                    placeholder="Select Buyer"
+                    placeholder={t('buyer')}
                     onPress={() => setIsBuyerModalOpen(true)}
                 />
                 {selectedBuyer && (
-                    <Text className="text-gray-500 mb-4 ml-1">GST No: {selectedBuyer.gst_number || 'N/A'}</Text>
+                    <Text className="text-gray-500 mb-4 ml-1">GST: {selectedBuyer.gst_number || 'N/A'}</Text>
                 )}
 
                 {/* 2. Grain */}
@@ -308,8 +307,8 @@ const SalesScreen = () => {
                 </View>
 
                 {/* 6. Transport Details */}
-                <Text className="text-xl font-bold text-brand-navy mb-4 border-b border-gray-100 pb-2">Transport Details</Text>
-                <LabeledInput label="Transporter Name" value={transporter} onChange={setTransporter} placeholder="Transporter Name" />
+                <Text className="text-xl font-bold text-brand-navy mb-4 border-b border-gray-100 pb-2">{t('dispatchDetails')}</Text>
+                <LabeledInput label={t('transporterName')} value={transporter} onChange={setTransporter} placeholder={t('transporterName')} />
                 <View className="flex-row justify-between">
                     <View className="w-[48%]">
                         <LabeledInput label={t('vehicleNo')} value={vehicleNo} onChange={setVehicleNo} placeholder="HR-XX-XXXX" />
@@ -337,10 +336,10 @@ const SalesScreen = () => {
                 <View className="flex-1 justify-end bg-black/50">
                     <View className="bg-white rounded-t-3xl p-6 h-[70%]">
                         <View className="flex-row justify-between items-center mb-4">
-                            <Text className="text-2xl font-bold text-brand-navy">Select Buyer</Text>
+                            <Text className="text-2xl font-bold text-brand-navy">{t('buyer')}</Text>
                             {!isNewBuyerMode && (
                                 <TouchableOpacity onPress={() => setIsNewBuyerMode(true)} className="bg-brand-gold px-4 py-2 rounded-lg">
-                                    <Text className="text-brand-navy font-bold">+ New</Text>
+                                    <Text className="text-brand-navy font-bold">{t('addNew')}</Text>
                                 </TouchableOpacity>
                             )}
                         </View>
@@ -349,21 +348,21 @@ const SalesScreen = () => {
                             <View>
                                 <TextInput
                                     className="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-4"
-                                    placeholder="Party Name"
+                                    placeholder={t('enterName')}
                                     value={newBuyerName}
                                     onChangeText={setNewBuyerName}
                                 />
                                 <TextInput
                                     className="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-4"
-                                    placeholder="GST Number (Optional)"
+                                    placeholder={t('gst') + " (Optional)"}
                                     value={newBuyerGst}
                                     onChangeText={setNewBuyerGst}
                                 />
                                 <TouchableOpacity onPress={handleCreateBuyer} className="bg-brand-navy p-4 rounded-xl items-center mb-2">
-                                    <Text className="text-white font-bold">Save Buyer</Text>
+                                    <Text className="text-white font-bold">{t('saveSupplier')}</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity onPress={() => setIsNewBuyerMode(false)} className="p-4 items-center">
-                                    <Text className="text-gray-500">Cancel</Text>
+                                    <Text className="text-gray-500">{t('cancel')}</Text>
                                 </TouchableOpacity>
                             </View>
                         ) : (
@@ -379,7 +378,7 @@ const SalesScreen = () => {
                                     )}
                                 />
                                 <TouchableOpacity onPress={() => setIsBuyerModalOpen(false)} className="mt-4 p-4 bg-gray-200 rounded-xl items-center">
-                                    <Text className="font-bold">Close</Text>
+                                    <Text className="font-bold">{t('close')}</Text>
                                 </TouchableOpacity>
                             </>
                         )}
@@ -394,7 +393,7 @@ const SalesScreen = () => {
             <Modal visible={isGrainModalOpen} transparent animationType="slide">
                 <View className="flex-1 justify-end bg-black/50">
                     <View className="bg-white rounded-t-3xl p-6 h-[50%]">
-                        <Text className="text-2xl font-bold text-brand-navy mb-4">Select Grain</Text>
+                        <Text className="text-2xl font-bold text-brand-navy mb-4">{t('selectGrain')}</Text>
                         <FlatList
                             data={grains}
                             keyExtractor={item => item.id.toString()}
@@ -405,7 +404,7 @@ const SalesScreen = () => {
                             )}
                         />
                         <TouchableOpacity onPress={() => setIsGrainModalOpen(false)} className="mt-4 p-4 bg-gray-200 rounded-xl items-center">
-                            <Text className="font-bold">Close</Text>
+                            <Text className="font-bold">{t('close')}</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -418,8 +417,8 @@ const SalesScreen = () => {
             <Modal visible={isAllocationModalOpen} transparent animationType="slide">
                 <View className="flex-1 justify-end bg-black/50">
                     <View className="bg-white rounded-t-3xl p-6 h-[80%]">
-                        <Text className="text-2xl font-bold text-brand-navy mb-4">Allocate Bags</Text>
-                        <Text className="text-gray-500 mb-4">Enter number of bags for each warehouse.</Text>
+                        <Text className="text-2xl font-bold text-brand-navy mb-4">{t('allocateBags')}</Text>
+                        <Text className="text-gray-500 mb-4">{t('enterBagsPrompt')}</Text>
 
                         <FlatList
                             data={warehouses}
@@ -442,9 +441,9 @@ const SalesScreen = () => {
                         />
 
                         <View className="mt-4">
-                            <Text className="text-center font-bold text-brand-navy text-lg mb-2">Total Selected: {totalBags} Bags</Text>
+                            <Text className="text-center font-bold text-brand-navy text-lg mb-2">{t('totalAmount')}: {totalBags} {t('bags')}</Text>
                             <TouchableOpacity onPress={() => setIsAllocationModalOpen(false)} className="bg-brand-navy p-4 rounded-xl items-center">
-                                <Text className="text-white font-bold">Confirm Allocation</Text>
+                                <Text className="text-white font-bold">{t('confirmAllocation')}</Text>
                             </TouchableOpacity>
                         </View>
                     </View>

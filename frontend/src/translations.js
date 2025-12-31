@@ -57,7 +57,32 @@ export const translations = {
         transportCost: "Transport",
         vehicleNo: "Vehicle No",
         driverName: "Driver Name",
+        vehicleNo: "Vehicle No",
+        driverName: "Driver Name",
+        transporterName: "Transporter Name",
         destination: "Destination",
+        destination: "Destination",
+
+        // Actions / Modals
+        addNew: "+ New",
+        newGrain: "New Grain",
+        newSupplier: "New Supplier",
+        newWarehouse: "New Warehouse",
+        enterName: "Enter Name",
+        grainName: "Grain Name",
+        hindiName: "Hindi Name",
+        location: "Location",
+        saveGrain: "Save Grain",
+        saveSupplier: "Save Supplier",
+        saveWarehouse: "Save Warehouse",
+        close: "Close",
+
+        // Alerts
+        reqName: "Name is required",
+        fillAll: "Please fill all fields",
+        recordSuccess: "Purchase Recorded!",
+        saleSuccess: "Sale Recorded!",
+        failedRecord: "Failed to record purchase",
 
         // Inventory
         stock: "Stock",
@@ -86,6 +111,11 @@ export const translations = {
         saveChanges: "Save Changes",
         transactionUpdated: "Transaction Updated",
         failedToUpdate: "Failed to update",
+
+        // Allocation Modal
+        allocateBags: "Allocate Bags",
+        enterBagsPrompt: "Enter number of bags for each warehouse.",
+        confirmAllocation: "Confirm Allocation",
 
         // Reports Extra
         filters: "Filters",
@@ -176,7 +206,29 @@ export const translations = {
         transportCost: "भाड़ा", // Bhada (Freight/Transport)
         vehicleNo: "गाड़ी नंबर",
         driverName: "ड्राइवर",
+        transporterName: "ट्रांसपोर्टर",
         destination: "जगह", // Place/Destination
+
+        // Actions / Modals
+        addNew: "+ नया",
+        newGrain: "नया अनाज",
+        newSupplier: "नया व्यापारी",
+        newWarehouse: "नया गोदाम",
+        enterName: "नाम लिखें",
+        grainName: "अनाज का नाम",
+        hindiName: "हिंदी नाम",
+        location: "जगह",
+        saveGrain: "अनाज सेव करें",
+        saveSupplier: "व्यापारी सेव करें",
+        saveWarehouse: "गोदाम सेव करें",
+        close: "बंद",
+
+        // Alerts
+        reqName: "नाम ज़रूरी है",
+        fillAll: "कृपया सभी जानकारी भरें",
+        recordSuccess: "खरीद दर्ज हो गयी!",
+        saleSuccess: "बिक्री दर्ज हो गयी!",
+        failedRecord: "खरीद दर्ज नहीं हो पायी",
 
         // Inventory
         stock: "स्टॉक",
@@ -205,6 +257,11 @@ export const translations = {
         saveChanges: "सुधारें",
         transactionUpdated: "लेन-देन सुधर गया",
         failedToUpdate: "सुधार नहीं हो पाया",
+
+        // Allocation Modal
+        allocateBags: "कट्टे भरें (गोदाम अनुसार)",
+        enterBagsPrompt: "हर गोदाम से कट्टे चुनें",
+        confirmAllocation: "पुष्टि करें",
 
         // Reports Extra
         filters: "फिल्टर",
