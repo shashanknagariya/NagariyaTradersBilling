@@ -390,6 +390,7 @@ const BillViewScreen = () => {
     };
 
     const generatePdf = async () => {
+        const htmlContent = generateHtml();
         try {
             if (Platform.OS === 'web') {
                 // On Web, use a manual iframe approach to ensure ONLY the bill HTML is printed

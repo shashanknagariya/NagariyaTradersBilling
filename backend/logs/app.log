@@ -88,3 +88,5 @@
 2026-01-02 19:56:57,534 - transactions - INFO - Transaction deleted: 25
 2026-01-02 19:57:02,964 - transactions - INFO - Dispatch Info deleted for group b60860a6-bf84-45fd-b2e9-8d9b72bdaea5
 2026-01-02 19:57:03,374 - transactions - INFO - Transaction deleted: 28
+2026-01-02 23:04:44,709 - auth - INFO - Login attempt for user: admin
+2026-01-02 23:04:45,956 - auth - INFO - Login successful for user: admin
