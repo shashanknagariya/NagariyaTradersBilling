@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from database import get_session
-from models import Transaction, PaymentHistory
-from typing import List
+from models import Transaction, PaymentHistory, DispatchInfo
+from typing import List, Optional
 from sqlalchemy import func
 from logger import get_logger
 logger = get_logger("transactions")
@@ -58,6 +58,22 @@ class BulkSaleCreate(BaseModel):
     tax_percentage: float = 0.0
     labour_cost_per_bag: float = 3.0
     transport_cost_per_qtl: float = 0.0
+    transport_advance: float = 0.0
+    mandi_cost: float = 9000.0 # Default total mandi cost for the bill
+
+class TransactionUpdate(BaseModel):
+    quantity_quintal: Optional[float] = None
+    rate_per_quintal: Optional[float] = None
+    number_of_bags: Optional[float] = None
+    amount_paid: Optional[float] = None
+    labour_cost_per_bag: Optional[float] = None
+    transport_cost_per_qtl: Optional[float] = None
+    mandi_cost: Optional[float] = None
+    expenses_total: Optional[float] = None
+    tax_percentage: Optional[float] = None
+    vehicle_number: Optional[str] = None
+    driver_name: Optional[str] = None
+    transporter_name: Optional[str] = None
 
 @router.post("/bulk_sale", response_model=List[Transaction])
 def create_bulk_sale(sale_data: BulkSaleCreate, session: Session = Depends(get_session)):
@@ -76,6 +92,15 @@ def create_bulk_sale(sale_data: BulkSaleCreate, session: Session = Depends(get_s
     max_inv = session.exec(select(func.max(Transaction.invoice_number)).where(Transaction.type == "sale")).first()
     next_inv = (max_inv or 0) + 1
 
+    # Calculate total quantity first for proportional cost distribution
+    total_sale_qty = 0.0
+    for alloc in sale_data.warehouses:
+         qty = (alloc.bags * sale_data.bharti) / 100.0
+         total_sale_qty += qty
+
+    transactions = []
+    
+    # 2. Iterate and Create Transactions
     for alloc in sale_data.warehouses:
         qty_quintal = (alloc.bags * sale_data.bharti) / 100.0
         
@@ -108,10 +133,22 @@ def create_bulk_sale(sale_data: BulkSaleCreate, session: Session = Depends(get_s
         labour_total = alloc.bags * sale_data.labour_cost_per_bag
         transport_total = qty_quintal * sale_data.transport_cost_per_qtl
         
+        # Mandi Cost Distribution
+        # Proportion = (this_qty / total_qty) * total_mandi_cost
+        mandi_share = 0.0
+        if total_sale_qty > 0:
+            mandi_share = (qty_quintal / total_sale_qty) * sale_data.mandi_cost
+        
         # NOTE: For SALE, we DO NOT deduct from Total Amount (Buyer pays full grain price).
         # These are internal expenses reflected in profit.
         expenses = labour_total + transport_total
-
+        # Mandi cost is also an expense but we store it separately or in expenses?
+        # Storing in separate field for now, but expenses_total usually tracked "other expenses".
+        # Let's keep expenses_total as is (labour+transport?) or include mandi?
+        # User asked for "Mandi Cost" field. We added it.
+        # Let's NOT add to expenses_total automatically to avoid confusion if expenses_total is used for "labour+transport" display.
+        # But for profit calc, we need to sum all.
+        
         subtotal = qty_quintal * sale_data.rate_per_quintal
         tax_amt = subtotal * (sale_data.tax_percentage / 100.0)
         total_amt = subtotal + tax_amt
@@ -131,6 +168,7 @@ def create_bulk_sale(sale_data: BulkSaleCreate, session: Session = Depends(get_s
             # Record Costs
             labour_cost_per_bag=sale_data.labour_cost_per_bag,
             transport_cost_per_qtl=sale_data.transport_cost_per_qtl,
+            mandi_cost=mandi_share,
             expenses_total=expenses,
             cost_price_per_quintal=avg_cost,
             payment_status="pending",
@@ -145,14 +183,76 @@ def create_bulk_sale(sale_data: BulkSaleCreate, session: Session = Depends(get_s
         session.add(transaction)
         transactions.append(transaction)
         
-        transactions.append(transaction)
-        
+    
+    # 3. Create Dispatch Record (Auto-calculated)
+    # Total Freight = Sum of (Qty * TransportRate)
+    total_qty_qtl = sum(t.quantity_quintal for t in transactions)
+    # Use the transport rate from the first item (assuming uniform rate for the trip) or from input
+    t_rate = sale_data.transport_cost_per_qtl
+    gross_freight = total_qty_qtl * t_rate
+    
+    dispatch_info = DispatchInfo(
+        sale_group_id=sale_group_id,
+        transporter_name=sale_data.transporter_name,
+        vehicle_number=sale_data.vehicle_number,
+        driver_name=sale_data.driver_name,
+        rate=t_rate,
+        total_weight=total_qty_qtl,
+        gross_freight=gross_freight,
+        advance_paid=sale_data.transport_advance, # Use input advance
+        status="pending"
+    )
+    session.add(dispatch_info)
+    
     session.commit()
+    # Refresh all to get IDs
     for t in transactions:
         session.refresh(t)
     
     logger.info(f"Bulk Sale Created: {len(transactions)} transactions. Group ID: {sale_group_id}")
     return transactions
+
+@router.get("/dispatch/{sale_group_id}", response_model=DispatchInfo)
+def get_dispatch_info(sale_group_id: str, session: Session = Depends(get_session)):
+    dispatch = session.exec(select(DispatchInfo).where(DispatchInfo.sale_group_id == sale_group_id)).first()
+    if not dispatch:
+        # Instead of 404, we can create one on the fly if missing (for legacy data), 
+        # BUT for now let's return 404 and handle in frontend or return empty
+        # Better: Return 404, frontend can show "Create" button or just empty fields
+        raise HTTPException(status_code=404, detail="Dispatch info not found")
+    return dispatch
+
+@router.put("/dispatch/{dispatch_id}", response_model=DispatchInfo)
+def update_dispatch_info(dispatch_id: int, updates: DispatchInfo, session: Session = Depends(get_session)):
+    dispatch = session.get(DispatchInfo, dispatch_id)
+    if not dispatch:
+        raise HTTPException(status_code=404, detail="Dispatch info not found")
+    
+    dispatch_data = updates.model_dump(exclude_unset=True)
+    
+    # Calculate potential new values
+    new_advance = dispatch_data.get('advance_paid', dispatch.advance_paid)
+    new_delivery = dispatch_data.get('delivery_paid', dispatch.delivery_paid)
+    new_shortage = dispatch_data.get('shortage_deduction', dispatch.shortage_deduction)
+    new_other = dispatch_data.get('other_deduction', dispatch.other_deduction)
+    
+    total_paid_deducted = new_advance + new_delivery + new_shortage + new_other
+    # Allow 1.0 buffer for float precision
+    if total_paid_deducted > dispatch.gross_freight + 1.0:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Total payments/deductions ({total_paid_deducted:.2f}) cannot exceed Gross Freight ({dispatch.gross_freight:.2f})"
+        )
+
+    for key, value in dispatch_data.items():
+        # Avoid overwriting ID or Group ID if passed
+        if key not in ['id', 'sale_group_id']:
+            setattr(dispatch, key, value)
+        
+    session.add(dispatch)
+    session.commit()
+    session.refresh(dispatch)
+    return dispatch
 
 @router.get("/bill/{transaction_id}", response_model=List[Transaction])
 def get_transaction_bill(transaction_id: int, session: Session = Depends(get_session)):
@@ -186,6 +286,22 @@ def delete_transaction(transaction_id: int, session: Session = Depends(get_sessi
         session.delete(p)
 
     session.delete(transaction)
+    
+    # Check if this was the last transaction in a group, if so, delete the Dispatch Info
+    if transaction.sale_group_id:
+        # Check if any other transaction exists with this group ID
+        others = session.exec(select(Transaction).where(
+            Transaction.sale_group_id == transaction.sale_group_id, 
+            Transaction.id != transaction_id
+        )).first()
+        
+        if not others:
+            # Delete Dispatch Info
+            dispatch = session.exec(select(DispatchInfo).where(DispatchInfo.sale_group_id == transaction.sale_group_id)).first()
+            if dispatch:
+                session.delete(dispatch)
+                logger.info(f"Dispatch Info deleted for group {transaction.sale_group_id}")
+
     session.commit()
     logger.info(f"Transaction deleted: {transaction_id}")
     return {"ok": True}
@@ -296,5 +412,28 @@ def update_transaction(transaction_id: int, updates: TransactionUpdate, session:
     session.add(transaction)
     session.commit()
     session.refresh(transaction)
+    
+    # NEW: Sync Dispatch Info if Quantity or Transport Cost changed
+    if transaction.sale_group_id and (updates.quantity_quintal is not None or updates.transport_cost_per_qtl is not None):
+        dispatch = session.exec(select(DispatchInfo).where(DispatchInfo.sale_group_id == transaction.sale_group_id)).first()
+        if dispatch:
+            # Re-fetch all transactions in group to recalculate totals
+            group_trxs = session.exec(select(Transaction).where(Transaction.sale_group_id == transaction.sale_group_id)).all()
+            
+            new_total_qty = sum(t.quantity_quintal for t in group_trxs)
+            # We assume rate might differ or just take average? 
+            # Safest is to calculate Total Freight based on individual rows
+            new_gross_freight = sum(t.quantity_quintal * t.transport_cost_per_qtl for t in group_trxs)
+            
+            dispatch.total_weight = new_total_qty
+            dispatch.gross_freight = new_gross_freight
+            # Update rate to match the updated transaction if changed, or keep average
+            if updates.transport_cost_per_qtl:
+                 dispatch.rate = updates.transport_cost_per_qtl
+            
+            session.add(dispatch)
+            session.commit()
+            logger.info(f"Dispatch Info updated for group {transaction.sale_group_id}")
+
     logger.info(f"Transaction updated: {transaction_id}")
     return transaction

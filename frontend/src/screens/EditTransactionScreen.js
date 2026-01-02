@@ -32,6 +32,7 @@ const EditTransactionScreen = () => {
     // Cost Fields
     const [labourCost, setLabourCost] = useState('');
     const [transportCost, setTransportCost] = useState('');
+    const [mandiCost, setMandiCost] = useState('');
 
     const [notes, setNotes] = useState('');
 
@@ -88,6 +89,7 @@ const EditTransactionScreen = () => {
 
             setLabourCost(target.labour_cost_per_bag ? target.labour_cost_per_bag.toString() : '3.0');
             setTransportCost(target.transport_cost_per_qtl ? target.transport_cost_per_qtl.toString() : '0.0');
+            setMandiCost(target.mandi_cost ? target.mandi_cost.toString() : '0.0');
 
         } catch (e) {
             console.error(e);
@@ -135,7 +137,8 @@ const EditTransactionScreen = () => {
                 total_amount: total,
                 notes: notes,
                 labour_cost_per_bag: parseFloat(labourCost) || 0,
-                transport_cost_per_qtl: parseFloat(transportCost) || 0
+                transport_cost_per_qtl: parseFloat(transportCost) || 0,
+                mandi_cost: parseFloat(mandiCost) || 0
             };
 
             // Only add sales fields if it's a sale
@@ -242,6 +245,9 @@ const EditTransactionScreen = () => {
                         <>
                             <Label>{t('transportCostPerQtl')}</Label>
                             <Input value={transportCost} onChangeText={setTransportCost} keyboardType="numeric" placeholder="0.0" />
+
+                            <Label>{t('mandiCost')} ({t('total')})</Label>
+                            <Input value={mandiCost} onChangeText={setMandiCost} keyboardType="numeric" placeholder="0.0" />
                         </>
                     )}
 

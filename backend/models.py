@@ -57,6 +57,7 @@ class Transaction(SQLModel, table=True):
     # New Cost fields (Purchase & Sale)
     labour_cost_per_bag: float = Field(default=3.0) 
     transport_cost_per_qtl: float = Field(default=0.0)
+    mandi_cost: float = Field(default=0.0) # Total Mandi Cost (distributed)
     
     # Store calculated totals
     labour_cost_total: float = Field(default=0.0) # Used in Purchase to deduct
@@ -113,3 +114,28 @@ class TransactionRead(Transaction):
     grain_name: str
     contact_name: str
     warehouse_name: str
+
+class DispatchInfo(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    sale_group_id: str = Field(index=True) # Link to all transactions in this bill
+    
+    # Copied from Main for reference/editing specific to Dispatch
+    transporter_name: Optional[str] = None
+    vehicle_number: Optional[str] = None
+    driver_name: Optional[str] = None
+    
+    # Financials
+    rate: float = Field(default=0.0) # Rate per quintal
+    total_weight: float = Field(default=0.0)
+    gross_freight: float = Field(default=0.0) # Total Payable before deductions
+    
+    # Payments
+    advance_paid: float = Field(default=0.0)
+    delivery_paid: float = Field(default=0.0)
+    
+    # Deductions
+    shortage_deduction: float = Field(default=0.0)
+    other_deduction: float = Field(default=0.0)
+    deduction_note: Optional[str] = None
+    
+    status: str = Field(default="pending") # pending, cleared

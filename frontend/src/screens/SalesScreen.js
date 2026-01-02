@@ -27,11 +27,11 @@ const SalesScreen = () => {
     const [gstRate, setGstRate] = useState('0');
 
     // Costs
-    const [labourCost, setLabourCost] = useState('3');
-    const [transportCost, setTransportCost] = useState('0');
-
-    // Transport Details
-    const [transporter, setTransporter] = useState('');
+    const [labourCost, setLabourCost] = useState('3.00'); // Per Bag
+    const [transportCost, setTransportCost] = useState('0.00'); // Per Quintal
+    const [transportAdvance, setTransportAdvance] = useState(''); // Total Advance for this bill
+    const [mandiCost, setMandiCost] = useState('9000'); // Total Mandi Cost
+    const [transporterName, setTransporterName] = useState('');
     const [vehicleNo, setVehicleNo] = useState('');
     const [driverName, setDriverName] = useState('');
     const [destination, setDestination] = useState('');
@@ -118,7 +118,9 @@ const SalesScreen = () => {
             tax_percentage: parseFloat(gstRate) || 0,
             labour_cost_per_bag: parseFloat(labourCost),
             transport_cost_per_qtl: parseFloat(transportCost),
-            transporter_name: transporter,
+            transport_advance: parseFloat(transportAdvance) || 0,
+            mandi_cost: parseFloat(mandiCost) || 0, // NEW
+            transporter_name: transporterName,
             destination: destination,
             driver_name: driverName,
             vehicle_number: vehicleNo,
@@ -138,10 +140,11 @@ const SalesScreen = () => {
             // Reset
             setAllocations({});
             setRate('');
-            setTransporter('');
+            setTransporterName('');
             setVehicleNo('');
             setDriverName('');
             setDestination('');
+            setTransportAdvance('0');
         } catch (e) {
             console.error(e);
             let msg = e.response?.data?.detail || t('failedRecord');
@@ -305,18 +308,21 @@ const SalesScreen = () => {
 
                 {/* 5.5 Hidden Costs (Internal) */}
                 <Text className="text-xl font-bold text-gray-400 mb-4 border-b border-gray-100 pb-2 mt-4">Internal Costs ({t('profit')} calc)</Text>
-                <View className="flex-row justify-between">
-                    <View className="w-[48%]">
+                <View className="flex-row justify-between flex-wrap">
+                    <View className="w-[48%] mb-4">
                         <LabeledInput label={`${t('labourCost')} / ${t('bags')}`} value={labourCost} onChange={setLabourCost} keyboardType="numeric" placeholder="3.00" />
                     </View>
-                    <View className="w-[48%]">
+                    <View className="w-[48%] mb-4">
                         <LabeledInput label={`${t('transportCost')} / Qtl`} value={transportCost} onChange={setTransportCost} keyboardType="numeric" placeholder="0.00" />
+                    </View>
+                    <View className="w-[48%] mb-4">
+                        <LabeledInput label={t('mandiCost') + " (Total)"} value={mandiCost} onChange={setMandiCost} keyboardType="numeric" placeholder="9000" />
                     </View>
                 </View>
 
                 {/* 6. Transport Details */}
                 <Text className="text-xl font-bold text-brand-navy mb-4 border-b border-gray-100 pb-2">{t('dispatchDetails')}</Text>
-                <LabeledInput label={t('transporterName')} value={transporter} onChange={setTransporter} placeholder={t('transporterName')} />
+                <LabeledInput label={t('transporterName')} value={transporterName} onChange={setTransporterName} placeholder={t('transporterName')} />
                 <View className="flex-row justify-between">
                     <View className="w-[48%]">
                         <LabeledInput label={t('vehicleNo')} value={vehicleNo} onChange={setVehicleNo} placeholder="HR-XX-XXXX" />
@@ -325,7 +331,14 @@ const SalesScreen = () => {
                         <LabeledInput label={t('driverName')} value={driverName} onChange={setDriverName} placeholder="Driver Name" />
                     </View>
                 </View>
-                <LabeledInput label={t('destination')} value={destination} onChange={setDestination} placeholder="City/State" />
+                <View className="flex-row justify-between">
+                    <View className="w-[48%]">
+                        <LabeledInput label={t('destination')} value={destination} onChange={setDestination} placeholder="City/State" />
+                    </View>
+                    <View className="w-[48%]">
+                        <LabeledInput label={t('advanceDriver')} value={transportAdvance} onChange={setTransportAdvance} keyboardType="numeric" placeholder="0" />
+                    </View>
+                </View>
 
                 <TouchableOpacity
                     className="bg-brand-gold p-4 rounded-xl items-center shadow-md active:opacity-90 mt-4"

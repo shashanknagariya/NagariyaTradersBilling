@@ -46,12 +46,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from routers import auth, master_data, transactions, inventory, stats
+from routers import auth, master_data, transactions, inventory, stats, reports
 app.include_router(auth.router)
 app.include_router(master_data.router)
 app.include_router(transactions.router)
 app.include_router(inventory.router)
 app.include_router(stats.router)
+app.include_router(reports.router)
 
 @app.get("/")
 def read_root():

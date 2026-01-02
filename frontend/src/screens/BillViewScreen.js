@@ -46,8 +46,11 @@ const BillViewScreen = () => {
     // Aggregates
     const [totalQty, setTotalQty] = useState(0);
     const [totalAmt, setTotalAmt] = useState(0);
+    const [totalMandiCost, setTotalMandiCost] = useState(0);
     const [mainTrx, setMainTrx] = useState(null);
     const [showProfit, setShowProfit] = useState(false);
+
+    const [dispatchInfo, setDispatchInfo] = useState(null);
 
     useEffect(() => {
         fetchData();
@@ -90,9 +93,21 @@ const BillViewScreen = () => {
 
                 const tQty = tRes.data.reduce((sum, item) => sum + item.quantity_quintal, 0);
                 const tAmt = tRes.data.reduce((sum, item) => sum + item.total_amount, 0);
+                const tMandi = tRes.data.reduce((sum, item) => sum + (item.mandi_cost || 0), 0);
 
                 setTotalQty(tQty);
                 setTotalAmt(tAmt);
+                setTotalMandiCost(tMandi);
+
+                // Fetch Dispatch Info if Sale
+                if (main.type === 'sale' && main.sale_group_id) {
+                    try {
+                        const dRes = await client.get(`/transactions/dispatch/${main.sale_group_id}`);
+                        setDispatchInfo(dRes.data);
+                    } catch (e) {
+                        console.log("No dispatch info found or error", e);
+                    }
+                }
             }
 
         } catch (e) {
@@ -485,6 +500,60 @@ const BillViewScreen = () => {
     const [deductionNote, setDeductionNote] = useState('');
     const [settlementLoading, setSettlementLoading] = useState(false);
 
+    // Dispatch Modal State
+    const [dispatchModalVisible, setDispatchModalVisible] = useState(false);
+    const [dAdvance, setDAdvance] = useState('0');
+    const [dDelivery, setDDelivery] = useState('0');
+    const [dShortage, setDShortage] = useState('0');
+    const [dOther, setDOther] = useState('0');
+
+    const openDispatchModal = () => {
+        if (dispatchInfo) {
+            setDAdvance(dispatchInfo.advance_paid.toString());
+            setDDelivery(dispatchInfo.delivery_paid.toString());
+            setDShortage(dispatchInfo.shortage_deduction.toString());
+            setDOther(dispatchInfo.other_deduction.toString());
+            setDispatchModalVisible(true);
+        }
+    };
+
+    const handleUpdateDispatch = async () => {
+        try {
+            const updates = {
+                advance_paid: parseFloat(dAdvance) || 0,
+                delivery_paid: parseFloat(dDelivery) || 0,
+                shortage_deduction: parseFloat(dShortage) || 0,
+                other_deduction: parseFloat(dOther) || 0,
+            };
+
+            const res = await client.put(`/transactions/dispatch/${dispatchInfo.id}`, updates);
+            setDispatchInfo(res.data);
+            setDispatchModalVisible(false);
+            if (Platform.OS === 'web') {
+                alert(t('success') + ": " + t('transportUpdateSuccess'));
+            } else {
+                Alert.alert(t('success'), t('transportUpdateSuccess'));
+            }
+        } catch (e) {
+            console.error(e);
+            let msg = e.response?.data?.detail || t('transportUpdateFail');
+
+            // Localize specific backend error
+            if (msg.includes("cannot exceed Gross Freight")) {
+                msg = t('transportOverpaymentError');
+            }
+
+            if (Platform.OS === 'web') {
+                alert(t('error') + ": " + msg);
+            } else {
+                // On Mobile, if Modal is open, Alert might be hidden or z-index issue
+                // We can close modal then show alert, OR just show alert
+                // Generally Alert works over Modal on iOS/Android, but let's be safe
+                Alert.alert(t('error'), msg);
+            }
+        }
+    };
+
     // Initializer for modal
     const openSettlement = () => {
         if (mainTrx) {
@@ -549,6 +618,59 @@ const BillViewScreen = () => {
                     </View>
                 )}
 
+                {/* Dispatch Payment Card - Sale Only */}
+                {dispatchInfo && (
+                    <View className="mx-4 mt-4 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                        <View className="flex-row justify-between items-center mb-2">
+                            <Text className="font-bold text-lg text-brand-navy">🚛 {t('transportPayment') || "Transport Payment"}</Text>
+                            <TouchableOpacity onPress={() => openDispatchModal()} className="bg-gray-100 px-3 py-1 rounded border border-gray-300">
+                                <Text className="text-xs font-bold text-brand-navy">{t('edit')}</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <Text className="text-gray-800 font-bold mb-2">{dispatchInfo.transporter_name || "Unknown Transporter"}</Text>
+
+                        <View className="bg-gray-50 p-3 rounded-lg">
+                            <View className="flex-row justify-between mb-1">
+                                <Text className="text-gray-600">{t('totalFreight')} ({dispatchInfo.total_weight.toFixed(2)} Qtl * {dispatchInfo.rate}):</Text>
+                                <Text className="font-bold">₹ {dispatchInfo.gross_freight.toFixed(2)}</Text>
+                            </View>
+
+                            <View className="flex-row justify-between mb-1">
+                                <Text className="text-green-600">(-) {t('advancePaid')}:</Text>
+                                <Text className="text-green-600 font-bold">- ₹ {dispatchInfo.advance_paid.toFixed(2)}</Text>
+                            </View>
+                            <View className="flex-row justify-between mb-1">
+                                <Text className="text-green-600">(-) {t('paidAfterDelivery')}:</Text>
+                                <Text className="text-green-600 font-bold">- ₹ {dispatchInfo.delivery_paid.toFixed(2)}</Text>
+                            </View>
+
+                            {(dispatchInfo.shortage_deduction > 0 || dispatchInfo.other_deduction > 0) && (
+                                <>
+                                    <View className="h-[1px] bg-gray-200 my-1" />
+                                    <View className="flex-row justify-between mb-1">
+                                        <Text className="text-red-500">(-) {t('shortageCut')}:</Text>
+                                        <Text className="text-red-500 font-bold">- ₹ {dispatchInfo.shortage_deduction.toFixed(2)}</Text>
+                                    </View>
+                                    <View className="flex-row justify-between mb-1">
+                                        <Text className="text-red-500">(-) {t('otherDeductions')}:</Text>
+                                        <Text className="text-red-500 font-bold">- ₹ {dispatchInfo.other_deduction.toFixed(2)}</Text>
+                                    </View>
+                                </>
+                            )}
+
+                            <View className="h-[1px] bg-gray-300 my-2" />
+
+                            <View className="flex-row justify-between">
+                                <Text className="font-bold text-brand-navy">{t('balancePending')}:</Text>
+                                <Text className={`font-bold ${(dispatchInfo.gross_freight - dispatchInfo.advance_paid - dispatchInfo.delivery_paid - dispatchInfo.shortage_deduction - dispatchInfo.other_deduction) > 1 ? 'text-red-600' : 'text-green-600'}`}>
+                                    ₹ {(dispatchInfo.gross_freight - dispatchInfo.advance_paid - dispatchInfo.delivery_paid - dispatchInfo.shortage_deduction - dispatchInfo.other_deduction).toFixed(2)}
+                                </Text>
+                            </View>
+                        </View>
+                    </View>
+                )}
+
                 {/* Profit Display (Private) - Admin Only */}
                 {isAdmin && mainTrx?.type === 'sale' && (mainTrx.cost_price_per_quintal > 0) && (
                     <View className="mx-4 mt-4">
@@ -565,10 +687,13 @@ const BillViewScreen = () => {
                                             <Text className="text-gray-400 text-xs">✕ Hide</Text>
                                         </TouchableOpacity>
                                     </View>
-                                    <Text className="text-green-600 text-xs">Based on Settlement</Text>
+                                    <Text className="text-green-600 text-xs">Gross Profit: ₹ {billData.reduce((sum, t) => sum + calculateProfit(t), 0).toFixed(2)}</Text>
+                                    {totalMandiCost > 0 && (
+                                        <Text className="text-red-500 text-xs">(-) Mandi Cost: ₹ {totalMandiCost.toFixed(2)}</Text>
+                                    )}
                                 </View>
-                                <Text className={`font-bold text-2xl ${calculateProfit(mainTrx) >= 0 ? 'text-green-700' : 'text-red-600'}`}>
-                                    ₹ {calculateProfit(mainTrx).toFixed(2)}
+                                <Text className={`font-bold text-2xl ${(billData.reduce((sum, t) => sum + calculateProfit(t), 0) - totalMandiCost) >= 0 ? 'text-green-700' : 'text-red-600'}`}>
+                                    ₹ {(billData.reduce((sum, t) => sum + calculateProfit(t), 0) - totalMandiCost).toFixed(2)}
                                 </Text>
                             </View>
                         )}
@@ -647,6 +772,46 @@ const BillViewScreen = () => {
                                 disabled={settlementLoading}
                             >
                                 {settlementLoading ? <ActivityIndicator color="#1e1b4b" /> : <Text className="font-bold text-brand-navy">{t('updateSettlement')}</Text>}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Dispatch Modal */}
+            <Modal visible={dispatchModalVisible} transparent animationType="slide" onRequestClose={() => setDispatchModalVisible(false)}>
+                <View className="flex-1 justify-center items-center bg-black/50 px-4">
+                    <View className="bg-white w-full rounded-2xl p-6">
+                        <Text className="text-xl font-bold text-brand-navy mb-4">Manage Transport Payment</Text>
+
+                        <View className="flex-row justify-between mb-4">
+                            <View className="w-[48%]">
+                                <Text className="mb-1 font-bold text-gray-700">Advance Paid</Text>
+                                <TextInput className="border border-gray-300 rounded p-2 bg-gray-50" keyboardType="numeric" value={dAdvance} onChangeText={setDAdvance} placeholder="0" />
+                            </View>
+                            <View className="w-[48%]">
+                                <Text className="mb-1 font-bold text-gray-700">Paid After Delivery</Text>
+                                <TextInput className="border border-gray-300 rounded p-2 bg-gray-50" keyboardType="numeric" value={dDelivery} onChangeText={setDDelivery} placeholder="0" />
+                            </View>
+                        </View>
+
+                        <View className="flex-row justify-between mb-4">
+                            <View className="w-[48%]">
+                                <Text className="mb-1 font-bold text-gray-700">Shortage Cut</Text>
+                                <TextInput className="border border-gray-300 rounded p-2 bg-gray-50" keyboardType="numeric" value={dShortage} onChangeText={setDShortage} placeholder="0" />
+                            </View>
+                            <View className="w-[48%]">
+                                <Text className="mb-1 font-bold text-gray-700">Other Deductions</Text>
+                                <TextInput className="border border-gray-300 rounded p-2 bg-gray-50" keyboardType="numeric" value={dOther} onChangeText={setDOther} placeholder="0" />
+                            </View>
+                        </View>
+
+                        <View className="flex-row justify-end space-x-4">
+                            <TouchableOpacity onPress={() => setDispatchModalVisible(false)} className="p-3">
+                                <Text className="font-bold text-gray-500">{t('cancel')}</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={handleUpdateDispatch} className="bg-brand-gold px-6 py-3 rounded-xl">
+                                <Text className="font-bold text-brand-navy">Save Updates</Text>
                             </TouchableOpacity>
                         </View>
                     </View>

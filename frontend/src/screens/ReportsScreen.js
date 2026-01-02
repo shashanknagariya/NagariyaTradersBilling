@@ -12,6 +12,7 @@ const ReportsScreen = () => {
     const { t } = useLanguage();
     const [viewMode, setViewMode] = useState('list'); // 'list' | 'analytics'
     const [transactions, setTransactions] = useState([]);
+    const [transportData, setTransportData] = useState([]); // NEW
     const [grains, setGrains] = useState({});
     const [contacts, setContacts] = useState({});
     const [warehouses, setWarehouses] = useState({});
@@ -29,7 +30,7 @@ const ReportsScreen = () => {
     const [groupBy, setGroupBy] = useState('none'); // none, grain, party
     const [analyticsStartDate, setAnalyticsStartDate] = useState('');
     const [analyticsEndDate, setAnalyticsEndDate] = useState('');
-    const [reportType, setReportType] = useState('profit'); // profit, purchase, sale
+    const [reportType, setReportType] = useState('profit'); // profit, purchase, sale, transport
 
     // Payment Modal State
     const [isPaymentModalVisible, setPaymentModalVisible] = useState(false);
@@ -42,26 +43,35 @@ const ReportsScreen = () => {
         }, [])
     );
 
+    useEffect(() => {
+        fetchData();
+    }, [reportType]);
+
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [tRes, gRes, cRes, wRes] = await Promise.all([
-                client.get('/transactions/'),
-                client.get('/master/grains'),
-                client.get('/master/contacts'),
-                client.get('/master/warehouses')
-            ]);
+            if (reportType === 'transport') {
+                const res = await client.get('/reports/transport');
+                setTransportData(res.data);
+            } else {
+                const [tRes, gRes, cRes, wRes] = await Promise.all([
+                    client.get('/transactions/'),
+                    client.get('/master/grains'),
+                    client.get('/master/contacts'),
+                    client.get('/master/warehouses')
+                ]);
 
-            const gMap = {}; gRes.data.forEach(g => gMap[g.id] = g.name);
-            setGrains(gMap);
+                const gMap = {}; gRes.data.forEach(g => gMap[g.id] = g.name);
+                setGrains(gMap);
 
-            const cMap = {}; cRes.data.forEach(c => cMap[c.id] = c.name);
-            setContacts(cMap);
+                const cMap = {}; cRes.data.forEach(c => cMap[c.id] = c.name);
+                setContacts(cMap);
 
-            const wMap = {}; wRes.data.forEach(w => wMap[w.id] = w.name);
-            setWarehouses(wMap);
+                const wMap = {}; wRes.data.forEach(w => wMap[w.id] = w.name);
+                setWarehouses(wMap);
 
-            setTransactions(tRes.data);
+                setTransactions(tRes.data);
+            }
         } catch (e) {
             console.error(e);
         } finally {
@@ -69,10 +79,28 @@ const ReportsScreen = () => {
         }
     };
 
+    // Transport Filtered Data
+    const filteredTransportData = useMemo(() => {
+        if (reportType !== 'transport') return [];
+        return transportData.filter(d => {
+            if (analyticsStartDate) {
+                const s = new Date(analyticsStartDate); s.setHours(0, 0, 0, 0);
+                if (new Date(d.date).getTime() < s.getTime()) return false;
+            }
+            if (analyticsEndDate) {
+                const e = new Date(analyticsEndDate); e.setHours(23, 59, 59, 999);
+                if (new Date(d.date).getTime() > e.getTime()) return false;
+            }
+            return true;
+        });
+    }, [transportData, analyticsStartDate, analyticsEndDate, reportType]);
+
     const reportData = useMemo(() => {
         if (viewMode !== 'analytics') return [];
+        if (reportType === 'transport') return filteredTransportData; // Use transport data
 
         // Helper
+
         const getNetTotal = (t) => {
             if (t.type === 'purchase') return t.total_amount;
             // For sale, subtract deductions
@@ -112,21 +140,14 @@ const ReportsScreen = () => {
             const deductionCost = t.deduction_amount || 0;
             const labourCostTotal = bags * (t.labour_cost_per_bag || 0);
             const transportCostTotal = qty * (t.transport_cost_per_qtl || 0);
+            const mandiCostTotal = t.mandi_cost || 0;
 
-            // Net Realized
-            const netRealized = baseAmount - shortageCost - deductionCost - labourCostTotal - transportCostTotal;
+            // Net Realized (Revenue - Expenses)
+            const netRealized = baseAmount - shortageCost - deductionCost - labourCostTotal - transportCostTotal - mandiCostTotal;
 
             // Payment Status
             const paidAmount = t.amount_paid || 0;
-            // For pending, we generally consider the "Bill Amount" (Net Realized + Labour + Transport) 
-            // effectively the "Party Payable" depends on if labour/transport is internal or billable. 
-            // Standard logic: Net Realized is what we get. 
-            // Actually, "Balance Due" in BillView is (Total - Shortage - Deduction) - Paid. 
-            // Labour/Transport are usually internal costs derived from that revenue, they don't reduce the Party's bill unless explicitly deducted.
-            // Wait, standard definition: 
-            // Bill Amount (Receivable from Party) = BaseAmount - Shortage - Deduction.
-            // Labour/Transport are expenses for US, not deductions for PARTY (usually).
-            // Let's stick to: effectiveTotal = BaseAmount - Shortage - Deduction.
+            // effectiveTotal is Party Payable, Mandi Cost is internal expense (like labour/transport usually)
             const effectiveTotal = baseAmount - shortageCost - deductionCost;
             const pendingAmount = effectiveTotal - paidAmount;
 
@@ -181,7 +202,7 @@ const ReportsScreen = () => {
         }
 
         return data;
-    }, [transactions, viewMode, reportType, analyticsStartDate, analyticsEndDate, groupBy, contacts, grains, warehouses]);
+    }, [transactions, viewMode, reportType, analyticsStartDate, analyticsEndDate, groupBy, contacts, grains, warehouses, filteredTransportData]);
 
     const downloadCsv = async () => {
         if (reportData.length === 0) { Alert.alert("No Data"); return; }
@@ -192,8 +213,24 @@ const ReportsScreen = () => {
         if (groupBy !== 'none') {
             headers = ['Group Name', 'Count', 'Total Qty', 'Total Amount', 'Paid', 'Pending', 'Total Profit'];
             rows = reportData.map(d => [d.name, d.count, d.qty.toFixed(2), d.amount.toFixed(2), d.paid.toFixed(2), d.pending.toFixed(2), d.profit.toFixed(2)]);
+        } else if (reportType === 'transport') {
+            headers = ['Date', 'Invoice', 'Transporter', 'Vehicle', 'Weight', 'Rate', 'Total Freight', 'Advance', 'Delivery Paid', 'Deductions', 'Pending', 'Status'];
+            rows = reportData.map(d => [
+                new Date(d.date).toLocaleDateString().replace(/,/g, ''),
+                d.invoice_number || '-',
+                `"${d.transporter_name}"`,
+                d.vehicle_number || '-',
+                d.total_weight.toFixed(2),
+                d.rate.toFixed(2),
+                d.gross_freight.toFixed(2),
+                d.advance_paid.toFixed(2),
+                d.delivery_paid.toFixed(2),
+                d.total_deduction.toFixed(2),
+                d.balance_pending.toFixed(2),
+                d.status
+            ]);
         } else {
-            headers = ['Date', 'Invoice', 'Party', 'Grain', 'Bags', 'Qty', 'Rate', 'Gross', 'Short', 'Ded', 'Lab', 'Trans', 'Net Realized', 'Paid', 'Pending', 'Status'];
+            headers = ['Date', 'Invoice', 'Party', 'Grain', 'Bags', 'Qty', 'Rate', 'Gross', 'Short', 'Ded', 'Lab', 'Trans', 'Mandi', 'Net Realized', 'Paid', 'Pending', 'Status'];
             if (reportType === 'profit') { headers.push('Avg Cost'); headers.push('Profit'); }
 
             rows = reportData.map(d => {
@@ -210,6 +247,7 @@ const ReportsScreen = () => {
                     d.deductionCost.toFixed(2),
                     d.labourCostTotal.toFixed(2),
                     d.transportCostTotal.toFixed(2),
+                    (d.mandi_cost || 0).toFixed(2),
                     d.netRealized.toFixed(2),
                     d.paidAmount.toFixed(2),
                     d.pendingAmount.toFixed(2),
@@ -294,6 +332,42 @@ const ReportsScreen = () => {
                     </tr>
                 `;
             });
+        } else if (reportType === 'transport') {
+            html += `
+                <thead>
+                    <tr>
+                        <th class="text-left">Date</th>
+                        <th>Inv</th>
+                        <th class="text-left">Transporter</th>
+                        <th>Weight</th>
+                        <th>Rate</th>
+                        <th>Freight</th>
+                        <th>Adv</th>
+                        <th>Del. Paid</th>
+                        <th>Ded.</th>
+                        <th>Pending</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+            `;
+            reportData.forEach(d => {
+                html += `
+                    <tr>
+                        <td class="text-left">${new Date(d.date).toLocaleDateString()}</td>
+                        <td>${d.invoice_number || '-'}</td>
+                        <td class="text-left">${d.transporter_name}</td>
+                        <td>${d.total_weight.toFixed(2)}</td>
+                        <td>${d.rate.toFixed(0)}</td>
+                        <td>${d.gross_freight.toFixed(0)}</td>
+                        <td>${d.advance_paid.toFixed(0)}</td>
+                        <td>${d.delivery_paid.toFixed(0)}</td>
+                        <td>${d.total_deduction.toFixed(0)}</td>
+                        <td>${d.balance_pending.toFixed(0)}</td>
+                        <td>${d.status}</td>
+                    </tr>
+                `;
+            });
         } else {
             // Detailed
             html += `
@@ -305,6 +379,12 @@ const ReportsScreen = () => {
                         <th class="text-left">Grain</th>
                         <th>Qty</th>
                         <th>Rate</th>
+                        <th>Gross</th>
+                        <th>Short</th>
+                        <th>Ded</th>
+                        <th>Lab</th>
+                        <th>Trans</th>
+                        <th>Mandi</th>
                         <th>Net</th>
                         <th>Paid</th>
                         <th>Pending</th>
@@ -322,6 +402,12 @@ const ReportsScreen = () => {
                         <td class="text-left">${d.grainName}</td>
                         <td>${d.quantity_quintal.toFixed(2)}</td>
                         <td>${d.rate_per_quintal.toFixed(0)}</td>
+                        <td>${d.baseAmount.toFixed(0)}</td>
+                        <td>${d.shortageCost.toFixed(0)}</td>
+                        <td>${d.deductionCost.toFixed(0)}</td>
+                        <td>${d.labourCostTotal.toFixed(0)}</td>
+                        <td>${d.transportCostTotal.toFixed(0)}</td>
+                        <td>${(d.mandi_cost || 0).toFixed(0)}</td>
                         <td>${d.netRealized.toFixed(0)}</td>
                         <td>${d.paidAmount.toFixed(0)}</td>
                         <td>${d.pendingAmount.toFixed(0)}</td>
@@ -344,6 +430,20 @@ const ReportsScreen = () => {
                     <td>${reportData.reduce((sum, d) => sum + d.pending, 0).toFixed(2)}</td>
                     <td>${reportData.reduce((sum, d) => sum + d.profit, 0).toFixed(2)}</td>
                 `;
+            } else if (reportType === 'transport') {
+                html += `
+                    <td></td><!-- Date -->
+                    <td></td><!-- Inv -->
+                    <td class="text-left">TOTAL</td><!-- Transporter -->
+                    <td>${reportData.reduce((sum, d) => sum + d.total_weight, 0).toFixed(2)}</td><!-- Weight -->
+                    <td></td><!-- Rate -->
+                    <td>${reportData.reduce((sum, d) => sum + d.gross_freight, 0).toFixed(0)}</td><!-- Freight -->
+                    <td>${reportData.reduce((sum, d) => sum + d.advance_paid, 0).toFixed(0)}</td><!-- Adv -->
+                    <td>${reportData.reduce((sum, d) => sum + d.delivery_paid, 0).toFixed(0)}</td><!-- Del Paid -->
+                    <td>${reportData.reduce((sum, d) => sum + d.total_deduction, 0).toFixed(0)}</td><!-- Ded -->
+                    <td>${reportData.reduce((sum, d) => sum + d.balance_pending, 0).toFixed(0)}</td><!-- Pending -->
+                    <td></td><!-- Status -->
+                `;
             } else {
                 // Detailed total
                 html += `
@@ -353,6 +453,12 @@ const ReportsScreen = () => {
                     <td></td><!-- Grain -->
                     <td>${reportData.reduce((sum, d) => sum + d.quantity_quintal, 0).toFixed(2)}</td><!-- Qty -->
                     <td></td><!-- Rate -->
+                    <td>${reportData.reduce((sum, d) => sum + d.baseAmount, 0).toFixed(0)}</td><!-- Gross -->
+                    <td>${reportData.reduce((sum, d) => sum + d.shortageCost, 0).toFixed(0)}</td><!-- Short -->
+                    <td>${reportData.reduce((sum, d) => sum + d.deductionCost, 0).toFixed(0)}</td><!-- Ded -->
+                    <td>${reportData.reduce((sum, d) => sum + d.labourCostTotal, 0).toFixed(0)}</td><!-- Lab -->
+                    <td>${reportData.reduce((sum, d) => sum + d.transportCostTotal, 0).toFixed(0)}</td><!-- Trans -->
+                    <td>${reportData.reduce((sum, d) => sum + (d.mandi_cost || 0), 0).toFixed(0)}</td><!-- Mandi -->
                     <td>${reportData.reduce((sum, d) => sum + d.netRealized, 0).toFixed(0)}</td><!-- Net -->
                     <td>${reportData.reduce((sum, d) => sum + d.paidAmount, 0).toFixed(0)}</td><!-- Paid -->
                     <td>${reportData.reduce((sum, d) => sum + d.pendingAmount, 0).toFixed(0)}</td><!-- Pending -->
@@ -716,29 +822,33 @@ const ReportsScreen = () => {
                     <View className="bg-white p-4 rounded-xl shadow-sm mb-4">
                         <Text className="font-bold text-gray-700 mb-2">{t('reportSettings')}</Text>
                         <View className="flex-row mb-4 flex-wrap">
-                            {['profit', 'purchase', 'sale'].map(tVal => (
+                            {['profit', 'purchase', 'sale', 'transport'].map(tVal => (
                                 <TouchableOpacity
                                     key={tVal}
                                     onPress={() => setReportType(tVal)}
                                     className={`mr-2 mb-2 px-3 py-1 rounded-lg border ${reportType === tVal ? 'bg-brand-navy border-brand-navy' : 'bg-gray-50 border-gray-200'}`}
                                 >
-                                    <Text className={`capitalize font-bold ${reportType === tVal ? 'text-white' : 'text-gray-600'}`}>{t(tVal)}</Text>
+                                    <Text className={`capitalize font-bold ${reportType === tVal ? 'text-white' : 'text-gray-600'}`}>
+                                        {tVal === 'transport' ? t('transportAnalysis') : t(tVal)}
+                                    </Text>
                                 </TouchableOpacity>
                             ))}
                         </View>
 
-                        <View className="flex-row mb-4 items-center">
-                            <Text className="mr-2 text-gray-500">{t('groupBy')}:</Text>
-                            {['none', 'grain', 'party', 'warehouse'].map(g => (
-                                <TouchableOpacity
-                                    key={g}
-                                    onPress={() => setGroupBy(g)}
-                                    className={`mr-2 px-2 py-1 rounded border ${groupBy === g ? 'bg-brand-gold border-brand-gold' : 'bg-gray-50 border-gray-200'}`}
-                                >
-                                    <Text className={`capitalize text-xs font-bold ${groupBy === g ? 'text-brand-navy' : 'text-gray-500'}`}>{t(g)}</Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
+                        {reportType !== 'transport' && (
+                            <View className="flex-row mb-4 items-center">
+                                <Text className="mr-2 text-gray-500">{t('groupBy')}:</Text>
+                                {['none', 'grain', 'party', 'warehouse'].map(g => (
+                                    <TouchableOpacity
+                                        key={g}
+                                        onPress={() => setGroupBy(g)}
+                                        className={`mr-2 px-2 py-1 rounded border ${groupBy === g ? 'bg-brand-gold border-brand-gold' : 'bg-gray-50 border-gray-200'}`}
+                                    >
+                                        <Text className={`capitalize text-xs font-bold ${groupBy === g ? 'text-brand-navy' : 'text-gray-500'}`}>{t(g)}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        )}
 
                         <View className="flex-row space-x-2 mb-4">
                             {Platform.OS === 'web' ? (
@@ -823,22 +933,44 @@ const ReportsScreen = () => {
                                             <Text className="font-bold w-24 text-right text-gray-700">{t('total')} {t('profit')}</Text>
                                         </>
                                     ) : (
-                                        <>
-                                            <Text className="font-bold w-20 text-gray-700">{t('date')}</Text>
-                                            <Text className="font-bold w-16 text-gray-700">{t('invoice')}</Text>
-                                            <Text className="font-bold w-28 text-gray-700">{t('buyer')}/{t('supplier')}</Text>
-                                            <Text className="font-bold w-20 text-gray-700">{t('selectGrain')}</Text>
-                                            {/* Condensed Costs columns to fit Payment columns */}
-                                            <Text className="font-bold w-12 text-right text-gray-700">Qty</Text>
-                                            <Text className="font-bold w-12 text-right text-gray-700">Rate</Text>
-                                            <Text className="font-bold w-20 text-right text-brand-navy">{t('net')}</Text>
-                                            <Text className="font-bold w-20 text-right text-green-700">{t('paid')}</Text>
-                                            <Text className="font-bold w-20 text-right text-red-600">{t('pending')}</Text>
-                                            <Text className="font-bold w-16 text-center text-gray-700">{t('status')}</Text>
-                                            {reportType === 'profit' && (
-                                                <Text className="font-bold w-16 text-right text-gray-700">{t('profit')}</Text>
-                                            )}
-                                        </>
+                                        reportType === 'transport' ? (
+                                            <>
+                                                <Text className="font-bold w-20 text-gray-700">{t('colDate')}</Text>
+                                                <Text className="font-bold w-16 text-gray-700">{t('colInvoice')}</Text>
+                                                <Text className="font-bold w-28 text-gray-700">{t('colTransporter')}</Text>
+                                                <Text className="font-bold w-20 text-gray-700">{t('colVehicle')}</Text>
+                                                <Text className="font-bold w-16 text-right text-gray-700">{t('colWeight')}</Text>
+                                                <Text className="font-bold w-16 text-right text-gray-700">{t('colRate')}</Text>
+                                                <Text className="font-bold w-20 text-right text-brand-navy">{t('colFreight')}</Text>
+                                                <Text className="font-bold w-20 text-right text-green-700">{t('colAdvance')}</Text>
+                                                <Text className="font-bold w-20 text-right text-green-700">{t('colDelivery')}</Text>
+                                                <Text className="font-bold w-16 text-right text-orange-600">{t('colDeduction')}</Text>
+                                                <Text className="font-bold w-20 text-right text-red-600">{t('colPending')}</Text>
+                                                <Text className="font-bold w-16 text-center text-gray-700">{t('colStatus')}</Text>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Text className="font-bold w-20 text-gray-700">{t('date')}</Text>
+                                                <Text className="font-bold w-16 text-gray-700">{t('invoice')}</Text>
+                                                <Text className="font-bold w-28 text-gray-700">{t('buyer')}/{t('supplier')}</Text>
+                                                <Text className="font-bold w-20 text-gray-700">{t('selectGrain')}</Text>
+                                                <Text className="font-bold w-12 text-right text-gray-700">Qty</Text>
+                                                <Text className="font-bold w-12 text-right text-gray-700">Rate</Text>
+                                                <Text className="font-bold w-20 text-right text-brand-navy">{t('gross')}</Text>
+                                                <Text className="font-bold w-16 text-right text-orange-600">{t('shortage')}</Text>
+                                                <Text className="font-bold w-16 text-right text-orange-600">{t('deduction')}</Text>
+                                                <Text className="font-bold w-16 text-right text-orange-600">{t('labour')}</Text>
+                                                <Text className="font-bold w-16 text-right text-orange-600">{t('transport')}</Text>
+                                                <Text className="font-bold w-12 text-right text-gray-700">Mandi</Text>
+                                                <Text className="font-bold w-20 text-right text-brand-navy">{t('net')}</Text>
+                                                <Text className="font-bold w-20 text-right text-green-700">{t('paid')}</Text>
+                                                <Text className="font-bold w-20 text-right text-red-600">{t('pending')}</Text>
+                                                <Text className="font-bold w-16 text-center text-gray-700">{t('status')}</Text>
+                                                {reportType === 'profit' && (
+                                                    <Text className="font-bold w-16 text-right text-gray-700">{t('profit')}</Text>
+                                                )}
+                                            </>
+                                        )
                                     )}
                                 </View>
 
@@ -856,21 +988,44 @@ const ReportsScreen = () => {
                                                 <Text className={`w-24 text-right text-xs font-bold ${d.profit >= 0 ? 'text-green-600' : 'text-red-500'}`}>{d.profit.toFixed(0)}</Text>
                                             </>
                                         ) : (
-                                            <>
-                                                <Text className="w-20 text-xs">{new Date(d.date).toLocaleDateString()}</Text>
-                                                <Text className="w-16 text-xs">{d.invoice_number}</Text>
-                                                <Text className="w-28 text-xs" numberOfLines={1}>{d.contactName}</Text>
-                                                <Text className="w-20 text-xs" numberOfLines={1}>{d.grainName}</Text>
-                                                <Text className="w-12 text-right text-xs">{d.quantity_quintal.toFixed(0)}</Text>
-                                                <Text className="w-12 text-right text-xs">{d.rate_per_quintal.toFixed(0)}</Text>
-                                                <Text className="w-20 text-right text-xs font-bold text-brand-navy">{d.netRealized.toFixed(0)}</Text>
-                                                <Text className="w-20 text-right text-xs text-green-700">{d.paidAmount.toFixed(0)}</Text>
-                                                <Text className="w-20 text-right text-xs text-red-600">{d.pendingAmount.toFixed(0)}</Text>
-                                                <Text className={`w-16 text-center text-xs font-bold ${d.status === 'Paid' ? 'text-green-600' : d.status === 'Partial' ? 'text-orange-500' : 'text-red-500'}`}>{d.status}</Text>
-                                                {reportType === 'profit' && (
-                                                    <Text className={`w-16 text-right text-xs font-bold ${d.profit >= 0 ? 'text-green-600' : 'text-red-500'}`}>{d.profit.toFixed(0)}</Text>
-                                                )}
-                                            </>
+                                            reportType === 'transport' ? (
+                                                <>
+                                                    <Text className="w-20 text-xs">{new Date(d.date).toLocaleDateString()}</Text>
+                                                    <Text className="w-16 text-xs">{d.invoice_number}</Text>
+                                                    <Text className="w-28 text-xs">{d.transporter_name}</Text>
+                                                    <Text className="w-20 text-xs" numberOfLines={1}>{d.vehicle_number || '-'}</Text>
+                                                    <Text className="w-16 text-right text-xs">{d.total_weight.toFixed(2)}</Text>
+                                                    <Text className="w-16 text-right text-xs">{d.rate.toFixed(0)}</Text>
+                                                    <Text className="w-20 text-right text-xs font-bold text-brand-navy">{d.gross_freight.toFixed(0)}</Text>
+                                                    <Text className="w-20 text-right text-xs text-green-700">{d.advance_paid.toFixed(0)}</Text>
+                                                    <Text className="w-20 text-right text-xs text-green-700">{d.delivery_paid.toFixed(0)}</Text>
+                                                    <Text className="w-16 text-right text-xs text-orange-600">{d.total_deduction.toFixed(0)}</Text>
+                                                    <Text className="w-20 text-right text-xs text-red-600">{d.balance_pending.toFixed(0)}</Text>
+                                                    <Text className={`w-16 text-center text-xs font-bold ${d.status === 'Paid' ? 'text-green-600' : d.status === 'Partial' ? 'text-orange-500' : 'text-red-500'}`}>{d.status}</Text>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Text className="w-20 text-xs">{new Date(d.date).toLocaleDateString()}</Text>
+                                                    <Text className="w-16 text-xs">{d.invoice_number}</Text>
+                                                    <Text className="w-28 text-xs" numberOfLines={1}>{d.contactName}</Text>
+                                                    <Text className="w-20 text-xs" numberOfLines={1}>{d.grainName}</Text>
+                                                    <Text className="w-12 text-right text-xs">{d.quantity_quintal.toFixed(0)}</Text>
+                                                    <Text className="w-12 text-right text-xs">{d.rate_per_quintal.toFixed(0)}</Text>
+                                                    <Text className="w-20 text-right text-xs font-bold text-brand-navy">{d.baseAmount.toFixed(0)}</Text>
+                                                    <Text className="w-16 text-right text-xs text-orange-600">{d.shortageCost.toFixed(0)}</Text>
+                                                    <Text className="w-16 text-right text-xs text-orange-600">{d.deductionCost.toFixed(0)}</Text>
+                                                    <Text className="w-16 text-right text-xs text-orange-600">{d.labourCostTotal.toFixed(0)}</Text>
+                                                    <Text className="w-16 text-right text-xs text-orange-600">{d.transportCostTotal.toFixed(0)}</Text>
+                                                    <Text className="w-12 text-right text-xs">{(d.mandi_cost || 0).toFixed(0)}</Text>
+                                                    <Text className="w-20 text-right text-xs font-bold text-brand-navy">{d.netRealized.toFixed(0)}</Text>
+                                                    <Text className="w-20 text-right text-xs text-green-700">{d.paidAmount.toFixed(0)}</Text>
+                                                    <Text className="w-20 text-right text-xs text-red-600">{d.pendingAmount.toFixed(0)}</Text>
+                                                    <Text className={`w-16 text-center text-xs font-bold ${d.status === 'Paid' ? 'text-green-600' : d.status === 'Partial' ? 'text-orange-500' : 'text-red-500'}`}>{d.status}</Text>
+                                                    {reportType === 'profit' && (
+                                                        <Text className={`w-16 text-right text-xs font-bold ${d.profit >= 0 ? 'text-green-600' : 'text-red-500'}`}>{d.profit.toFixed(0)}</Text>
+                                                    )}
+                                                </>
+                                            )
                                         )}
                                     </View>
                                 ))}
@@ -889,21 +1044,44 @@ const ReportsScreen = () => {
                                                 <Text className="w-24 text-right font-bold">₹{reportData.reduce((sum, d) => sum + d.profit, 0).toFixed(0)}</Text>
                                             </>
                                         ) : (
-                                            <>
-                                                <Text className="w-20 font-bold"></Text>
-                                                <Text className="w-16 font-bold"></Text>
-                                                <Text className="w-28 font-bold text-brand-navy">TOTAL</Text>
-                                                <Text className="w-20 font-bold"></Text>
-                                                <Text className="w-12 text-right font-bold">{reportData.reduce((sum, d) => sum + d.quantity_quintal, 0).toFixed(0)}</Text>
-                                                <Text className="w-12 text-right font-bold"></Text>
-                                                <Text className="w-20 text-right font-bold">{reportData.reduce((sum, d) => sum + d.netRealized, 0).toFixed(0)}</Text>
-                                                <Text className="w-20 text-right font-bold">{reportData.reduce((sum, d) => sum + d.paidAmount, 0).toFixed(0)}</Text>
-                                                <Text className="w-20 text-right font-bold">{reportData.reduce((sum, d) => sum + d.pendingAmount, 0).toFixed(0)}</Text>
-                                                <Text className="w-16 font-bold"></Text>
-                                                {reportType === 'profit' && (
-                                                    <Text className="w-16 text-right font-bold">{reportData.reduce((sum, d) => sum + d.profit, 0).toFixed(0)}</Text>
-                                                )}
-                                            </>
+                                            reportType === 'transport' ? (
+                                                <>
+                                                    <Text className="w-20 font-bold"></Text> {/* Date */}
+                                                    <Text className="w-16 font-bold"></Text> {/* Inv */}
+                                                    <Text className="w-28 font-bold text-brand-navy">TOTAL</Text> {/* Transporter */}
+                                                    <Text className="w-20 font-bold"></Text> {/* Vehicle */}
+                                                    <Text className="w-16 text-right font-bold">{reportData.reduce((sum, d) => sum + d.total_weight, 0).toFixed(2)}</Text>
+                                                    <Text className="w-16 font-bold"></Text> {/* Rate */}
+                                                    <Text className="w-20 text-right font-bold text-brand-navy">{reportData.reduce((sum, d) => sum + d.gross_freight, 0).toFixed(0)}</Text>
+                                                    <Text className="w-20 text-right font-bold text-green-700">{reportData.reduce((sum, d) => sum + d.advance_paid, 0).toFixed(0)}</Text>
+                                                    <Text className="w-20 text-right font-bold text-green-700">{reportData.reduce((sum, d) => sum + d.delivery_paid, 0).toFixed(0)}</Text>
+                                                    <Text className="w-16 text-right font-bold text-orange-600">{reportData.reduce((sum, d) => sum + d.total_deduction, 0).toFixed(0)}</Text>
+                                                    <Text className="w-20 text-right font-bold text-red-600">{reportData.reduce((sum, d) => sum + d.balance_pending, 0).toFixed(0)}</Text>
+                                                    <Text className="w-16 font-bold"></Text> {/* Status */}
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Text className="w-20 font-bold"></Text> {/* Date */}
+                                                    <Text className="w-16 font-bold"></Text> {/* Inv */}
+                                                    <Text className="w-28 font-bold text-brand-navy">TOTAL</Text> {/* Party */}
+                                                    <Text className="w-20 font-bold"></Text> {/* Grain */}
+                                                    <Text className="w-12 text-right font-bold">{reportData.reduce((sum, d) => sum + d.quantity_quintal, 0).toFixed(2)}</Text>
+                                                    <Text className="w-12 font-bold"></Text> {/* Rate */}
+                                                    <Text className="w-20 text-right font-bold text-brand-navy">{reportData.reduce((sum, d) => sum + d.baseAmount, 0).toFixed(0)}</Text>
+                                                    <Text className="w-16 text-right font-bold text-orange-600">{reportData.reduce((sum, d) => sum + d.shortageCost, 0).toFixed(0)}</Text>
+                                                    <Text className="w-16 text-right font-bold text-orange-600">{reportData.reduce((sum, d) => sum + d.deductionCost, 0).toFixed(0)}</Text>
+                                                    <Text className="w-16 text-right font-bold text-orange-600">{reportData.reduce((sum, d) => sum + d.labourCostTotal, 0).toFixed(0)}</Text>
+                                                    <Text className="w-16 text-right font-bold text-orange-600">{reportData.reduce((sum, d) => sum + d.transportCostTotal, 0).toFixed(0)}</Text>
+                                                    <Text className="w-12 text-right font-bold">{reportData.reduce((sum, d) => sum + (d.mandi_cost || 0), 0).toFixed(0)}</Text>
+                                                    <Text className="w-20 text-right font-bold text-brand-navy">{reportData.reduce((sum, d) => sum + d.netRealized, 0).toFixed(0)}</Text>
+                                                    <Text className="w-20 text-right font-bold text-green-700">{reportData.reduce((sum, d) => sum + d.paidAmount, 0).toFixed(0)}</Text>
+                                                    <Text className="w-20 text-right font-bold text-red-600">{reportData.reduce((sum, d) => sum + d.pendingAmount, 0).toFixed(0)}</Text>
+                                                    <Text className="w-16 font-bold"></Text> {/* Status */}
+                                                    {reportType === 'profit' && (
+                                                        <Text className="w-16 text-right font-bold">{reportData.reduce((sum, d) => sum + d.profit, 0).toFixed(0)}</Text>
+                                                    )}
+                                                </>
+                                            )
                                         )}
                                     </View>
                                 )}

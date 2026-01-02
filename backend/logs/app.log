@@ -13,3 +13,78 @@
 2026-01-02 13:20:14,553 - main - INFO - Server shutting down...
 2026-01-02 13:20:26,558 - main - INFO - Server starting up...
 2026-01-02 13:20:31,096 - main - INFO - Database initialized.
+2026-01-02 17:44:54,746 - main - INFO - Server shutting down...
+2026-01-02 17:45:27,396 - main - INFO - Server starting up...
+2026-01-02 17:45:32,831 - main - INFO - Database initialized.
+2026-01-02 17:45:53,015 - main - INFO - Server starting up...
+2026-01-02 17:45:57,822 - main - INFO - Database initialized.
+2026-01-02 17:46:15,206 - main - INFO - Server starting up...
+2026-01-02 17:46:21,556 - main - INFO - Database initialized.
+2026-01-02 17:48:42,828 - auth - INFO - Login attempt for user: admin
+2026-01-02 17:48:43,611 - auth - INFO - Login successful for user: admin
+2026-01-02 17:49:24,175 - transactions - INFO - Transaction created: PURCHASE 1 (Grain: 1)
+2026-01-02 17:50:45,089 - transactions - INFO - Bulk Sale Created: 2 transactions. Group ID: 3fb44d80-d5cc-4487-97f5-919bc332a71c
+2026-01-02 17:57:54,636 - main - INFO - Server shutting down...
+2026-01-02 17:58:07,991 - main - INFO - Server starting up...
+2026-01-02 17:58:12,776 - main - INFO - Database initialized.
+2026-01-02 17:58:27,162 - main - INFO - Server starting up...
+2026-01-02 17:58:31,659 - main - INFO - Database initialized.
+2026-01-02 17:58:45,157 - main - INFO - Server starting up...
+2026-01-02 17:58:49,957 - main - INFO - Database initialized.
+2026-01-02 17:59:02,131 - main - INFO - Server starting up...
+2026-01-02 17:59:06,750 - main - INFO - Database initialized.
+2026-01-02 18:00:52,339 - auth - INFO - Login attempt for user: admin
+2026-01-02 18:00:53,064 - auth - INFO - Login successful for user: admin
+2026-01-02 18:01:46,433 - transactions - INFO - Dispatch Info deleted for group 3fb44d80-d5cc-4487-97f5-919bc332a71c
+2026-01-02 18:01:46,807 - transactions - INFO - Transaction deleted: 26
+2026-01-02 18:03:17,629 - transactions - INFO - Bulk Sale Created: 2 transactions. Group ID: 0cac6fc5-9f89-4f01-b2c0-828a9819239d
+2026-01-02 18:07:55,719 - main - INFO - Server shutting down...
+2026-01-02 18:08:08,428 - main - INFO - Server starting up...
+2026-01-02 18:08:15,559 - main - INFO - Database initialized.
+2026-01-02 18:26:31,941 - auth - INFO - Login attempt for user: admin
+2026-01-02 18:26:33,006 - auth - INFO - Login successful for user: admin
+2026-01-02 18:27:46,182 - transactions - INFO - Dispatch Info deleted for group 0cac6fc5-9f89-4f01-b2c0-828a9819239d
+2026-01-02 18:27:46,563 - transactions - INFO - Transaction deleted: 27
+2026-01-02 18:29:09,688 - transactions - INFO - Bulk Sale Created: 1 transactions. Group ID: b60860a6-bf84-45fd-b2e9-8d9b72bdaea5
+2026-01-02 18:35:17,858 - auth - INFO - Login attempt for user: admin
+2026-01-02 18:35:18,618 - auth - INFO - Login successful for user: admin
+2026-01-02 18:46:57,142 - main - INFO - Server shutting down...
+2026-01-02 18:47:12,843 - main - INFO - Server starting up...
+2026-01-02 18:47:17,699 - main - INFO - Database initialized.
+2026-01-02 18:53:27,364 - auth - INFO - Login attempt for user: admin
+2026-01-02 18:53:28,192 - auth - INFO - Login successful for user: admin
+2026-01-02 18:57:07,005 - auth - INFO - Login attempt for user: admin
+2026-01-02 18:57:07,700 - auth - INFO - Login successful for user: admin
+2026-01-02 19:01:51,625 - auth - INFO - Login attempt for user: admin
+2026-01-02 19:01:52,446 - auth - INFO - Login successful for user: admin
+2026-01-02 19:06:11,943 - main - INFO - Server shutting down...
+2026-01-02 19:06:36,440 - main - INFO - Server starting up...
+2026-01-02 19:06:42,206 - main - INFO - Database initialized.
+2026-01-02 19:06:52,036 - main - INFO - Server shutting down...
+2026-01-02 19:07:05,128 - main - INFO - Server starting up...
+2026-01-02 19:07:09,808 - main - INFO - Database initialized.
+2026-01-02 19:07:22,130 - main - INFO - Server shutting down...
+2026-01-02 19:07:47,774 - main - INFO - Server starting up...
+2026-01-02 19:07:53,384 - main - INFO - Database initialized.
+2026-01-02 19:21:17,309 - auth - INFO - Login attempt for user: admin
+2026-01-02 19:21:18,379 - auth - INFO - Login successful for user: admin
+2026-01-02 19:26:20,041 - main - INFO - Server shutting down...
+2026-01-02 19:26:39,491 - main - INFO - Server starting up...
+2026-01-02 19:26:44,644 - main - INFO - Database initialized.
+2026-01-02 19:28:15,053 - auth - INFO - Login attempt for user: admin
+2026-01-02 19:28:15,830 - auth - INFO - Login successful for user: admin
+2026-01-02 19:32:35,268 - auth - INFO - Login attempt for user: admin
+2026-01-02 19:32:36,240 - auth - INFO - Login successful for user: admin
+2026-01-02 19:36:54,264 - auth - INFO - Login attempt for user: admin
+2026-01-02 19:36:55,417 - auth - INFO - Login successful for user: admin
+2026-01-02 19:39:44,749 - auth - INFO - Login attempt for user: admin
+2026-01-02 19:39:45,989 - auth - INFO - Login successful for user: admin
+2026-01-02 19:45:18,018 - auth - INFO - Login attempt for user: admin
+2026-01-02 19:45:18,881 - auth - INFO - Login successful for user: admin
+2026-01-02 19:51:35,960 - auth - INFO - Login attempt for user: admin
+2026-01-02 19:51:36,684 - auth - INFO - Login successful for user: admin
+2026-01-02 19:56:29,558 - auth - INFO - Login attempt for user: admin
+2026-01-02 19:56:30,419 - auth - INFO - Login successful for user: admin
+2026-01-02 19:56:57,534 - transactions - INFO - Transaction deleted: 25
+2026-01-02 19:57:02,964 - transactions - INFO - Dispatch Info deleted for group b60860a6-bf84-45fd-b2e9-8d9b72bdaea5
+2026-01-02 19:57:03,374 - transactions - INFO - Transaction deleted: 28

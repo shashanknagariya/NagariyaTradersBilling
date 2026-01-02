@@ -143,16 +143,53 @@ export const translations = {
         confirmPayment: "Confirm Payment",
         total: "Total",
         settlementUpdated: "Settlement Updated",
+        total: "Total",
+        settlementUpdated: "Settlement Updated",
+        total: "Total",
+        settlementUpdated: "Settlement Updated",
         failedPDF: "Failed to generate PDF",
+        transportPayment: "Transport Payment",
+        totalFreight: "Total Freight",
+        mandiCost: "Mandi Cost",
+        advancePaid: "Advance Paid",
+        paidAfterDelivery: "Paid After Delivery",
+        shortageCut: "Shortage Cut",
+        otherDeductions: "Other Deductions",
+        balancePending: "Balance Pending",
+        balancePending: "Balance Pending",
+        advanceDriver: "Advance (to Driver)",
+        transportUpdateSuccess: "Transport payment updated",
+        transportUpdateFail: "Failed to update transport payment",
+        transportOverpaymentError: "Total payments cannot exceed Total Freight",
+
+        colInvoice: "Invoice #",
+        colParty: "Party",
+        colGrain: "Grain",
+        colBags: "Bags",
+        colQty: "Qty (Qtl)",
+        colRate: "Rate",
+        colNet: "Net Amount",
+        colPaid: "Paid",
+        colPending: "Pending",
+        colStatus: "Status",
+
+        transportAnalysis: "Transport Analysis",
+        colTransporter: "Transporter",
+        colVehicle: "Vehicle",
+        colWeight: "Weight",
+        colFreight: "Total Freight",
+        colAdvance: "Advance",
+        colDelivery: "Delivery Paid",
+        colDeduction: "Deductions",
 
         // Table Headers
         groupName: "Group Name",
         count: "Count",
         gross: "Gross",
-        short: "Short",
-        ded: "Ded.",
-        lab: "Lab.",
-        trans: "Trans.",
+        shortage: "Shortage",
+        deduction: "Ded.",
+        labour: "Labour",
+        transport: "Trans.",
         net: "Net",
         avgCost: "Avg Cost"
     },
@@ -297,17 +334,56 @@ export const translations = {
         confirmPayment: "पुष्टि करें",
         total: "कुल",
         settlementUpdated: "हिसाब अपडेट हो गया",
+        total: "कुल",
+        settlementUpdated: "हिसाब अपडेट हो गया",
+        total: "कुल",
+        settlementUpdated: "हिसाब अपडेट हो गया",
+        total: "कुल",
+        settlementUpdated: "हिसाब अपडेट हो गया",
         failedPDF: "PDF नहीं बन पाया",
+        transportPayment: "भाड़ा भुगतान",
+        totalFreight: "कुल भाड़ा",
+        mandiCost: "मंडी शुल्क",
+        advancePaid: "एडवांस दिया",
+        paidAfterDelivery: "गाड़ी पहुँचने पर दिया",
+        shortageCut: "घट काटा",
+        otherDeductions: "अन्य कटौती",
+        balancePending: "बकाया राशि",
+        balancePending: "बकाया राशि",
+        advanceDriver: "एडवांस (ड्राइवर को)",
+        transportUpdateSuccess: "भाड़ा भुगतान अपडेट हो गया",
+        transportUpdateFail: "भाड़ा भुगतान अपडेट नहीं हो पाया",
+        transportOverpaymentError: "कुल भुगतान कुल भाड़े से ज्यादा नहीं हो सकता",
+
+        colInvoice: "बिल #",
+        colParty: "पार्टी",
+        colGrain: "अनाज",
+        colBags: "बोरे",
+        colQty: "वजन (क्विंटल)",
+        colRate: "रेट",
+        colNet: "शुद्ध राशि",
+        colPaid: "भुगतान",
+        colPending: "बकाया",
+        colStatus: "स्थिति",
+
+        transportAnalysis: "भाड़ा रिपोर्ट",
+        colTransporter: "ट्रांसपोर्टर",
+        colVehicle: "गाड़ी नंबर",
+        colWeight: "वजन",
+        colFreight: "कुल भाड़ा",
+        colAdvance: "एडवांस",
+        colDelivery: "गाड़ी पहुँचने पर",
+        colDeduction: "कटौती",
 
         // Table Headers
         groupName: "नाम",
         count: "गिनती",
-        gross: "कुल",
-        short: "कम", // Shortage
-        ded: "काट", // Deduction
-        lab: "मज़दूरी", // Labour
-        trans: "भाड़ा", // Transport
-        net: "शुद्ध", // Net
-        avgCost: "लागत"
+        gross: "कुल", // Gross
+        shortage: "घटा", // Shortage/Cut
+        deduction: "काटा", // Deduction
+        labour: "मजदूरी", // Labour
+        transport: "भाड़ा", // Transport
+        net: "नेट", // Net
+        avgCost: "औसत लागत"
     }
 };
