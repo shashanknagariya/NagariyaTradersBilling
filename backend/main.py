@@ -57,4 +57,9 @@ app.include_router(stats.router)
 def read_root():
     return {"message": "Welcome to Grain Manager API"}
 
+@app.get("/health")
+@app.head("/health")
+def health_check():
+    return {"status": "ok", "service": "grain-manager-api"}
+
 # Force reload for DB regeneration
