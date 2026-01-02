@@ -13,6 +13,9 @@ class BankDetails(BaseModel):
     ifsc: str
     holder_name: str
 
+from logger import get_logger
+logger = get_logger("master")
+
 router = APIRouter(prefix="/master", tags=["master"])
 
 # GRAINS
@@ -21,6 +24,7 @@ def create_grain(grain: Grain, session: Session = Depends(get_session)):
     session.add(grain)
     session.commit()
     session.refresh(grain)
+    logger.info(f"Grain created: {grain.name}")
     return grain
 
 @router.get("/grains", response_model=List[Grain])
@@ -34,6 +38,7 @@ def create_warehouse(warehouse: Warehouse, session: Session = Depends(get_sessio
     session.add(warehouse)
     session.commit()
     session.refresh(warehouse)
+    logger.info(f"Warehouse created: {warehouse.name}")
     return warehouse
 
 @router.get("/warehouses", response_model=List[Warehouse])
@@ -47,6 +52,7 @@ def create_contact(contact: Contact, session: Session = Depends(get_session)):
     session.add(contact)
     session.commit()
     session.refresh(contact)
+    logger.info(f"Contact created: {contact.name} ({contact.type})")
     return contact
 
 @router.get("/contacts", response_model=List[Contact])

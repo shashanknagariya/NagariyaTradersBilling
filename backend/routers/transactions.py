@@ -4,6 +4,8 @@ from database import get_session
 from models import Transaction, PaymentHistory
 from typing import List
 from sqlalchemy import func
+from logger import get_logger
+logger = get_logger("transactions")
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
@@ -33,6 +35,7 @@ def create_transaction(transaction: Transaction, session: Session = Depends(get_
     session.add(transaction)
     session.commit()
     session.refresh(transaction)
+    logger.info(f"Transaction created: {transaction.type.upper()} {transaction.invoice_number} (Grain: {transaction.grain_id})")
     return transaction
 
 from pydantic import BaseModel
@@ -142,10 +145,13 @@ def create_bulk_sale(sale_data: BulkSaleCreate, session: Session = Depends(get_s
         session.add(transaction)
         transactions.append(transaction)
         
+        transactions.append(transaction)
+        
     session.commit()
     for t in transactions:
         session.refresh(t)
-        
+    
+    logger.info(f"Bulk Sale Created: {len(transactions)} transactions. Group ID: {sale_group_id}")
     return transactions
 
 @router.get("/bill/{transaction_id}", response_model=List[Transaction])
@@ -181,6 +187,7 @@ def delete_transaction(transaction_id: int, session: Session = Depends(get_sessi
 
     session.delete(transaction)
     session.commit()
+    logger.info(f"Transaction deleted: {transaction_id}")
     return {"ok": True}
 
 class PaymentUpdate(BaseModel):
@@ -232,6 +239,7 @@ def update_payment(transaction_id: int, payment: PaymentUpdate, session: Session
     session.add(transaction)
     session.commit()
     session.refresh(transaction)
+    logger.info(f"Payment recorded: {payment.amount} for Trx {transaction_id}")
     return transaction
 
 @router.get("/{transaction_id}/payments", response_model=List[PaymentHistory])
@@ -288,4 +296,5 @@ def update_transaction(transaction_id: int, updates: TransactionUpdate, session:
     session.add(transaction)
     session.commit()
     session.refresh(transaction)
+    logger.info(f"Transaction updated: {transaction_id}")
     return transaction

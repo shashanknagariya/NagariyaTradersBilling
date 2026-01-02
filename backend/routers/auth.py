@@ -101,16 +101,24 @@ async def get_current_admin(current_user: User = Depends(get_current_user)):
 
 # Routes
 
+from logger import get_logger
+logger = get_logger("auth")
+
+# ... (imports)
+
 @router.post("/auth/login", response_model=Token)
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
+    logger.info(f"Login attempt for user: {form_data.username}")
     user = session.exec(select(User).where(User.username == form_data.username)).first()
     if not user or not verify_password(form_data.password, user.password_hash):
+        logger.warning(f"Login failed for user: {form_data.username}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
+    logger.info(f"Login successful for user: {form_data.username}")
     # Generate Token with Version
     access_token = create_access_token(data={"sub": user.username, "v": user.token_version})
     
@@ -132,27 +140,15 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
         }
     }
 
-@router.get("/auth/me", response_model=UserRead)
-async def read_users_me(current_user: User = Depends(get_current_user)):
-    perms = []
-    try:
-        perms = json.loads(current_user.permissions)
-    except:
-        pass
-        
-    return UserRead(
-        id=current_user.id,
-        username=current_user.username,
-        role=current_user.role,
-        permissions=perms,
-        token_version=current_user.token_version
-    )
+# ... (me endpoint)
 
 @router.post("/auth/setup")
 async def setup_initial_admin(user_data: UserCreate, session: Session = Depends(get_session)):
+    logger.info("Setup initial admin requested")
     # Only allow if no users exist
     users = session.exec(select(User)).all()
     if len(users) > 0:
+        logger.warning("Setup attempted but users already exist")
         raise HTTPException(status_code=400, detail="Setup already complete")
         
     user = User(
@@ -165,6 +161,7 @@ async def setup_initial_admin(user_data: UserCreate, session: Session = Depends(
     session.add(user)
     session.commit()
     session.refresh(user)
+    logger.info(f"Admin created via setup: {user.username}")
     return {"message": "Admin created"}
 
 # Admin User Management

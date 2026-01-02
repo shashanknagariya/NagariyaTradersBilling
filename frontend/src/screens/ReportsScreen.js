@@ -405,17 +405,17 @@ const ReportsScreen = () => {
         };
 
         if (Platform.OS === 'web') {
-            if (window.confirm("Are you sure you want to delete this transaction? This will update inventory.")) {
+            if (window.confirm(t('deleteConfirmMsg'))) {
                 doDelete();
             }
         } else {
             Alert.alert(
-                "Delete Transaction",
-                "Are you sure? This will update inventory.",
+                t('deleteConfirmTitle'),
+                t('deleteConfirmMsg'),
                 [
-                    { text: "Cancel", style: "cancel" },
+                    { text: t('cancel'), style: "cancel" },
                     {
-                        text: "Delete",
+                        text: t('delete'),
                         style: 'destructive',
                         onPress: doDelete
                     }

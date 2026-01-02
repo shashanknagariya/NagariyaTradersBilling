@@ -5,15 +5,21 @@ from sqlmodel import Session, select
 from models import User
 from routers.auth import get_password_hash
 
+from logger import get_logger
+
+logger = get_logger("main")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    logger.info("Server starting up...")
     create_db_and_tables()
+    logger.info("Database initialized.")
     
     # Seed Admin
     with Session(engine) as session:
         user = session.exec(select(User)).first()
         if not user:
-            print("Creating default admin...")
+            logger.info("Creating default admin...")
             admin = User(
                 username="admin", 
                 password_hash=get_password_hash("admin123"), 
@@ -23,9 +29,10 @@ async def lifespan(app: FastAPI):
             )
             session.add(admin)
             session.commit()
-            print("Default admin created: admin / admin123")
+            logger.info("Default admin created: admin / admin123")
     
     yield
+    logger.info("Server shutting down...")
 
 app = FastAPI(lifespan=lifespan, title="Grain Manager API")
 

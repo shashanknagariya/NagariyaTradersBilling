@@ -144,7 +144,15 @@ const SalesScreen = () => {
             setDestination('');
         } catch (e) {
             console.error(e);
-            const msg = e.response?.data?.detail || t('failedRecord');
+            let msg = e.response?.data?.detail || t('failedRecord');
+
+            // Localize specific backend errors
+            if (msg.includes("Insufficient stock")) {
+                // Keep the details (numbers) but translate the main message
+                // Backend: "Insufficient stock in {wh}. Available: ... Requested: ..."
+                msg = t('insufficientStock') + "\n" + msg.split('. ')[1];
+            }
+
             Alert.alert(t('error'), msg);
         }
     };

@@ -419,7 +419,7 @@ const BillViewScreen = () => {
             }
         } catch (error) {
             console.error(error);
-            Alert.alert("Error", "Failed to generate PDF");
+            Alert.alert(t('error'), t('failedPDF'));
         }
     };
 
@@ -464,13 +464,13 @@ const BillViewScreen = () => {
                 }
             }
 
-            Alert.alert("Success", "Settlement Updated");
+            Alert.alert(t('success'), t('settlementUpdated'));
             setSettlementModalVisible(false);
             setMarkAsPaid(false);
             fetchData();
         } catch (e) {
             console.error(e);
-            Alert.alert("Error", "Failed to update settlement");
+            Alert.alert(t('error'), t('failedToUpdate'));
         } finally {
             setSettlementLoading(false);
         }

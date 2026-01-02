@@ -3,6 +3,8 @@ from sqlmodel import Session, select
 from database import get_session
 from models import Transaction, Grain, Warehouse
 from typing import List, Dict, Any
+from logger import get_logger
+logger = get_logger("inventory")
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
 

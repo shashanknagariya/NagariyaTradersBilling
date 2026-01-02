@@ -82,6 +82,11 @@ export const translations = {
         fillAll: "Please fill all fields",
         recordSuccess: "Purchase Recorded!",
         saleSuccess: "Sale Recorded!",
+        deleteConfirmTitle: "Delete Transaction",
+        deleteConfirmMsg: "Are you sure? This will update inventory.",
+        cancel: "Cancel",
+        delete: "Delete",
+        insufficientStock: "Insufficient Stock in Warehouse",
         failedRecord: "Failed to record purchase",
 
         // Inventory
@@ -135,7 +140,10 @@ export const translations = {
         pendingAmount: "Pending Amount",
         amountPaying: "Amount Paying",
         confirmPayment: "Confirm Payment",
+        confirmPayment: "Confirm Payment",
         total: "Total",
+        settlementUpdated: "Settlement Updated",
+        failedPDF: "Failed to generate PDF",
 
         // Table Headers
         groupName: "Group Name",
@@ -227,7 +235,12 @@ export const translations = {
         reqName: "नाम ज़रूरी है",
         fillAll: "कृपया सभी जानकारी भरें",
         recordSuccess: "खरीद दर्ज हो गयी!",
-        saleSuccess: "बिक्री दर्ज हो गयी!",
+        saleSuccess: "बिक्री दर्ज की गई!",
+        deleteConfirmTitle: "लेनदेन हटाएं",
+        deleteConfirmMsg: "क्या आप सुनिश्चित हैं? इससे इन्वेंट्री अपडेट हो जाएगी।",
+        cancel: "रद्द करें",
+        delete: "हटाएं",
+        insufficientStock: "गोदाम में पर्याप्त स्टॉक नहीं है",
         failedRecord: "खरीद दर्ज नहीं हो पायी",
 
         // Inventory
@@ -281,7 +294,10 @@ export const translations = {
         pendingAmount: "बकाया राशि",
         amountPaying: "अब दे रहे हैं",
         confirmPayment: "पुष्टि करें",
+        confirmPayment: "पुष्टि करें",
         total: "कुल",
+        settlementUpdated: "हिसाब अपडेट हो गया",
+        failedPDF: "PDF नहीं बन पाया",
 
         // Table Headers
         groupName: "नाम",
