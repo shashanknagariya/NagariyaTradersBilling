@@ -391,10 +391,14 @@ const BillViewScreen = () => {
 
     const generatePdf = async () => {
         const htmlContent = generateHtml();
+        if (!htmlContent) {
+            Alert.alert(t('error'), "Bill content not ready");
+            return;
+        }
+
         try {
             if (Platform.OS === 'web') {
-                // On Web, use a manual iframe approach to ensure ONLY the bill HTML is printed
-                // This prevents the "whole page printing" issue
+                // On Web, use a manual iframe
                 const printFrame = document.createElement('iframe');
                 printFrame.style.position = 'absolute';
                 printFrame.style.top = '-1000px';
@@ -406,25 +410,28 @@ const BillViewScreen = () => {
                 frameDoc.write(htmlContent);
                 frameDoc.close();
 
-                // Wait for images/styles to load then print
                 setTimeout(() => {
                     printFrame.contentWindow.focus();
                     printFrame.contentWindow.print();
-
-                    // Cleanup
                     setTimeout(() => {
                         document.body.removeChild(printFrame);
                     }, 500);
                 }, 500);
             } else {
-                // On Mobile, generate PDF and share
+                // On Mobile
                 const { uri } = await Print.printToFileAsync({ html: htmlContent });
 
-                // Rename file
-                const contact = contacts[mainTrx.contact_id] || {};
+                const contact = (mainTrx && contacts[mainTrx.contact_id]) ? contacts[mainTrx.contact_id] : {};
                 const partyName = (contact.name || 'Unknown').replace(/[^a-zA-Z0-9]/g, '_');
-                const fileName = `${partyName}_${mainTrx.invoice_number || 'INV'}.pdf`;
+                const invoiceNo = mainTrx?.invoice_number || 'INV';
+                const fileName = `${partyName}_${invoiceNo}.pdf`;
                 const newUri = FileSystem.documentDirectory + fileName;
+
+                // Check if file exists and delete it to prevent moveAsync error if overwrite fails (though usually it overwrites)
+                const fileInfo = await FileSystem.getInfoAsync(newUri);
+                if (fileInfo.exists) {
+                    await FileSystem.deleteAsync(newUri, { idempotent: true });
+                }
 
                 await FileSystem.moveAsync({
                     from: uri,
@@ -435,7 +442,7 @@ const BillViewScreen = () => {
             }
         } catch (error) {
             console.error(error);
-            Alert.alert(t('error'), t('failedPDF'));
+            Alert.alert(t('error'), "PDF Error: " + error.message);
         }
     };
 
