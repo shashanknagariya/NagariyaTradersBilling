@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, Alert, Platform, Modal, TextInput, ScrollView } from 'react-native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
+import { StorageAccessFramework } from 'expo-file-system'; // Keep SAF if needed separately, or just use legacy
+import * as FileSystem from 'expo-file-system/legacy';
 import { WebView } from 'react-native-webview';
 import client from '../api/client';
 import { useNavigation, useRoute } from '@react-navigation/native';
