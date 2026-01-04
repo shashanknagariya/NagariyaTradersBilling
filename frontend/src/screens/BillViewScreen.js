@@ -46,6 +46,7 @@ const BillViewScreen = () => {
 
     // Aggregates
     const [totalQty, setTotalQty] = useState(0);
+    const [totalBags, setTotalBags] = useState(0); // NEW
     const [totalAmt, setTotalAmt] = useState(0);
     const [totalMandiCost, setTotalMandiCost] = useState(0);
     const [mainTrx, setMainTrx] = useState(null);
@@ -93,10 +94,12 @@ const BillViewScreen = () => {
                 setMainTrx(main);
 
                 const tQty = tRes.data.reduce((sum, item) => sum + item.quantity_quintal, 0);
+                const tBags = tRes.data.reduce((sum, item) => sum + (item.number_of_bags || 0), 0); // NEW
                 const tAmt = tRes.data.reduce((sum, item) => sum + item.total_amount, 0);
                 const tMandi = tRes.data.reduce((sum, item) => sum + (item.mandi_cost || 0), 0);
 
                 setTotalQty(tQty);
+                setTotalBags(tBags); // NEW
                 setTotalAmt(tAmt);
                 setTotalMandiCost(tMandi);
 
@@ -447,6 +450,124 @@ const BillViewScreen = () => {
         }
     };
 
+    const generateLetterHtml = () => {
+        if (!mainTrx) return '';
+        const grainName = grains[mainTrx.grain_id]?.name || 'Unknown';
+        const bharti = (totalBags && totalQty) ? ((totalQty * 100) / totalBags).toFixed(2) : '-';
+
+        // Style for filled blanks
+        const blankStyle = "border-bottom: 2px dashed #000; padding: 0 10px; font-weight: bold; display: inline-block; min-width: 50px; text-align: center;";
+
+        return `
+            <html>
+                <head>
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+                    <style>
+                        body { font-family: 'Helvetica', sans-serif; padding: 40px; font-size: 14px; width: 100%; box-sizing: border-box; }
+                        .header { text-align: center; }
+                        .title { font-size: 28px; font-weight: bold; color: #1a237e; margin-bottom: 5px; }
+                        .subtitle { font-size: 16px; color: #1a237e; font-weight: bold; }
+                        .desc { font-size: 14px; color: #1a237e; margin-bottom: 20px; border-bottom: 1px solid #1a237e; padding-bottom: 10px; }
+                        .row { display: flex; justify-content: space-between; margin-bottom: 30px; font-weight: bold; width: 100%; }
+                        .content { margin-top: 20px; font-size: 16px; line-height: 2.5; text-align: justify; }
+                        .footer { margin-top: 80px; text-align: right; font-weight: bold; font-size: 18px; }
+                        .box { border: 1px solid #1a237e; padding: 10px; text-align: center; margin: 15px 0; font-weight: bold; color: #1a237e; }
+                    </style>
+                </head>
+                <body>
+                    <div style="font-size: 12px; display: flex; justify-content: space-between; margin-bottom: 10px;">
+                        <span>GSTIN: 23BEKPN1849B1ZQ</span>
+                        <span>Mob: 9424785568, 9399968679</span>
+                    </div>
+                    <div class="header">
+                        <div class="title">मे. नगरिया ट्रेडर्स</div>
+                        <div class="subtitle">मेन रोड गंज, जिला छतरपुर (म.प्र.)</div>
+                        <div class="desc">गल्ला, दलहन, तिलहन एवम् महुआ के थोक व्यापारी</div>
+                    </div>
+                    
+                    <div class="box">
+                        M/s Nagariya Traders<br/>
+                        Food, Grain, Pulses & Oil Seed, Mahuwa Phool Dealer | Main Road GANJ, Distt. CHHATARPUR (M.P.)
+                    </div>
+
+                    <div class="row">
+                        <span>Ref. No. <span style="${blankStyle} min-width: 80px;">${mainTrx.invoice_number || '-'}</span></span>
+                        <span>Date: <span style="${blankStyle} min-width: 100px;">${new Date(mainTrx.date).toLocaleDateString()}</span></span>
+                    </div>
+
+                    <div class="content">
+                        <b>श्री भाई</b><br/>
+                        जोग लिखि <b style="${blankStyle} min-width: 150px;">गंज (छतरपुर, MP)</b> से मे. नगरिया ट्रेडर्स की जय गोपाल वांचना जी।<br/>
+                        आगे समाचार यह है कि गाड़ी नं. <span style="${blankStyle}">${mainTrx.vehicle_number || ''}</span> से जिन्स <span style="${blankStyle} min-width: 150px;">${grainName} / ${grains[mainTrx.grain_id]?.hindi_name || ''}</span><br/>
+                        बोरा <span style="${blankStyle}">${totalBags}</span> भरती <span style="${blankStyle}">${bharti}</span> वजन <span style="${blankStyle}">${totalQty.toFixed(2)}</span><br/>
+                        भेज रहे हैं। सो सम्भाल कर उतार लेना जी व माल हमारे खाते में जमा कर लेना।<br/>
+                        
+                        गाड़ी भाड़ा रेट <span style="${blankStyle}">${mainTrx.transport_cost_per_qtl || ''}</span> से एडवांस <span style="${blankStyle}">${mainTrx.transport_advance || ''}</span> दे दिया है।<br/>
+                        बाकी भाड़ा ............................................................................................................ दे देना।<br/><br/>
+                        
+                        <b>नोट -</b> हमारा ड्राफ्ट <span style="${blankStyle} min-width: 120px;">${bankData?.bank_name || ''}</span> A/c No.: <span style="${blankStyle} min-width: 150px;">${bankData?.account_no || ''}</span><br/>
+                        IFSC : <span style="${blankStyle} min-width: 120px;">${bankData?.ifsc || ''}</span> बनवाकर भेजे।<br/>
+                    </div>
+
+                    <div class="footer">
+                        वास्ते - मे. नगरिया ट्रेडर्स
+                    </div>
+                </body>
+            </html>
+        `;
+    };
+
+    const generateLetter = async () => {
+        const html = generateLetterHtml();
+        if (!html) { Alert.alert('Error', 'Data not ready'); return; }
+
+        try {
+            if (Platform.OS === 'web') {
+                const printFrame = document.createElement('iframe');
+                printFrame.style.position = 'absolute';
+                printFrame.style.top = '-1000px';
+                printFrame.style.left = '-1000px';
+                document.body.appendChild(printFrame);
+
+                const frameDoc = printFrame.contentDocument || printFrame.contentWindow.document;
+                frameDoc.open();
+                frameDoc.write(html);
+                frameDoc.close();
+
+                setTimeout(() => {
+                    printFrame.contentWindow.focus();
+                    printFrame.contentWindow.print();
+                    setTimeout(() => {
+                        document.body.removeChild(printFrame);
+                    }, 500);
+                }, 500);
+            } else {
+                const { uri } = await Print.printToFileAsync({ html });
+
+                const contact = (mainTrx && contacts[mainTrx.contact_id]) ? contacts[mainTrx.contact_id] : {};
+                const partyName = (contact.name || 'Unknown').replace(/[^a-zA-Z0-9]/g, '_');
+                const invoiceNo = mainTrx?.invoice_number || 'INV';
+                const fileName = `Letter_${partyName}_${invoiceNo}.pdf`;
+                const newUri = FileSystem.documentDirectory + fileName;
+
+                const fileInfo = await FileSystem.getInfoAsync(newUri);
+                if (fileInfo.exists) {
+                    await FileSystem.deleteAsync(newUri, { idempotent: true });
+                }
+
+                await FileSystem.moveAsync({
+                    from: uri,
+                    to: newUri
+                });
+
+                await Sharing.shareAsync(newUri, { UTI: '.pdf', mimeType: 'application/pdf', dialogTitle: `Share Letter` });
+            }
+        } catch (e) {
+            console.error(e);
+            Alert.alert('Error', 'Failed to generate Letter: ' + e.message);
+        }
+    };
+
     // Helper to calc net receivable
     const getNetReceivable = (trx) => {
         if (!trx) return 0;
@@ -585,9 +706,14 @@ const BillViewScreen = () => {
                     </TouchableOpacity>
                     <Text className="text-xl font-bold text-white">{t('billPreview')}</Text>
                 </View>
-                <TouchableOpacity onPress={generatePdf} className="bg-brand-gold px-3 py-1 rounded">
-                    <Text className="font-bold text-brand-navy">PDF</Text>
-                </TouchableOpacity>
+                <View className="flex-row">
+                    <TouchableOpacity onPress={generateLetter} className="bg-white border border-brand-gold px-3 py-1 rounded mr-2">
+                        <Text className="font-bold text-brand-navy">Letter</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={generatePdf} className="bg-brand-gold px-3 py-1 rounded">
+                        <Text className="font-bold text-brand-navy">PDF</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
 
             <ScrollView className="flex-1">
