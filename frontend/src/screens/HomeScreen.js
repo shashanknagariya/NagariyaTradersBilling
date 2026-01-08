@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Platform, RefreshControl } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Platform, RefreshControl, Alert } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import client from '../api/client';
@@ -39,10 +39,16 @@ const HomeScreen = () => {
     };
 
     const handleLogout = () => {
-        Alert.alert(t('logout'), "Are you sure?", [
-            { text: t('cancel'), style: "cancel" },
-            { text: t('logout'), onPress: logout }
-        ]);
+        if (Platform.OS === 'web') {
+            if (window.confirm("Are you sure?")) {
+                logout();
+            }
+        } else {
+            Alert.alert(t('logout'), "Are you sure?", [
+                { text: t('cancel'), style: "cancel" },
+                { text: t('logout'), onPress: logout }
+            ]);
+        }
     };
 
     return (
@@ -91,7 +97,7 @@ const HomeScreen = () => {
                     {hasAccess('inventory') && (
                         <ModuleCard title={t('inventory')} icon="📦" color="bg-white" onPress={() => navigation.navigate('Inventory')} />
                     )}
-                    {hasAccess('reports') && (
+                    {(hasAccess('reports') || hasAccess('reports_transaction') || hasAccess('reports_analysis')) && (
                         <ModuleCard title={t('reports')} icon="📄" color="bg-white" onPress={() => navigation.navigate('Reports')} />
                     )}
                     {isAdmin && (

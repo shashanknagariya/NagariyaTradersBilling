@@ -96,3 +96,20 @@
 2026-01-04 17:49:45,736 - auth - INFO - Login successful for user: admin
 2026-01-04 18:18:06,324 - auth - INFO - Login attempt for user: admin
 2026-01-04 18:18:07,174 - auth - INFO - Login successful for user: admin
+2026-01-07 23:08:36,309 - auth - INFO - Login attempt for user: admin
+2026-01-07 23:08:41,316 - auth - INFO - Login attempt for user: admin
+2026-01-07 23:08:44,883 - auth - INFO - Login successful for user: admin
+2026-01-07 23:24:13,628 - auth - INFO - Login attempt for user: admin
+2026-01-07 23:24:38,405 - auth - INFO - Login attempt for user: admin
+2026-01-07 23:24:43,705 - auth - INFO - Login successful for user: admin
+2026-01-07 23:28:58,718 - auth - INFO - Login attempt for user: admin
+2026-01-07 23:29:01,105 - auth - INFO - Login successful for user: admin
+2026-01-07 23:29:15,691 - auth - INFO - Login attempt for user: shashank
+2026-01-07 23:29:16,846 - auth - INFO - Login successful for user: shashank
+2026-01-07 23:29:45,479 - auth - INFO - Login attempt for user: admin
+2026-01-07 23:29:46,287 - auth - INFO - Login successful for user: admin
+2026-01-07 23:30:33,922 - auth - INFO - Login attempt for user: shashank
+2026-01-07 23:30:34,751 - auth - INFO - Login successful for user: shashank
+2026-01-07 23:33:48,288 - main - INFO - Server shutting down...
+2026-01-07 23:34:44,382 - main - INFO - Server starting up...
+2026-01-07 23:34:49,252 - main - INFO - Database initialized.

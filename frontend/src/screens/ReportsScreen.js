@@ -5,12 +5,36 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
 import * as Print from 'expo-print';
 
 const ReportsScreen = () => {
     const navigation = useNavigation();
     const { t } = useLanguage();
-    const [viewMode, setViewMode] = useState('list'); // 'list' | 'analytics'
+    const { userInfo } = useAuth();
+    const isAdmin = userInfo?.role === 'admin';
+    const perms = userInfo?.permissions || [];
+    const hasAccess = (perm) => isAdmin || perms.includes(perm);
+    // Determine default view mode based on permissions
+    const initialViewMode = useMemo(() => {
+        if (isAdmin || hasAccess('reports')) return 'list'; // Full access
+        if (hasAccess('reports_transaction') && hasAccess('reports_analysis')) return 'list'; // Full access
+        if (hasAccess('reports_analysis')) return 'analytics'; // Only analysis
+        return 'list'; // Default fallback
+    }, [userInfo]);
+
+    const [viewMode, setViewMode] = useState(initialViewMode); // 'list' | 'analytics'
+
+    // Force update viewMode if permissions change dynamically
+    useEffect(() => {
+        if (!isAdmin && !hasAccess('reports')) {
+            if (hasAccess('reports_analysis') && !hasAccess('reports_transaction')) {
+                setViewMode('analytics');
+            } else if (hasAccess('reports_transaction') && !hasAccess('reports_analysis')) {
+                setViewMode('list');
+            }
+        }
+    }, [userInfo]);
     const [transactions, setTransactions] = useState([]);
     const [transportData, setTransportData] = useState([]); // NEW
     const [grains, setGrains] = useState({});
@@ -54,12 +78,10 @@ const ReportsScreen = () => {
                 const res = await client.get('/reports/transport');
                 setTransportData(res.data);
             } else {
-                const [tRes, gRes, cRes, wRes] = await Promise.all([
-                    client.get('/transactions/'),
-                    client.get('/master/grains'),
-                    client.get('/master/contacts'),
-                    client.get('/master/warehouses')
-                ]);
+                const tRes = await client.get('/transactions/');
+                const gRes = await client.get('/master/grains');
+                const cRes = await client.get('/master/contacts');
+                const wRes = await client.get('/master/warehouses');
 
                 const gMap = {}; gRes.data.forEach(g => gMap[g.id] = g.name);
                 setGrains(gMap);
@@ -742,21 +764,33 @@ const ReportsScreen = () => {
                     </View>
                 </View>
 
-                {/* View Mode Tabs */}
-                <View className="flex-row bg-brand-navy-light/30 p-1 rounded-xl">
-                    <TouchableOpacity
-                        onPress={() => setViewMode('list')}
-                        className={`flex-1 py-2 items-center rounded-lg ${viewMode === 'list' ? 'bg-white' : ''}`}
-                    >
-                        <Text className={`font-bold ${viewMode === 'list' ? 'text-brand-navy' : 'text-gray-300'}`}>{t('transactions')}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        onPress={() => setViewMode('analytics')}
-                        className={`flex-1 py-2 items-center rounded-lg ${viewMode === 'analytics' ? 'bg-white' : ''}`}
-                    >
-                        <Text className={`font-bold ${viewMode === 'analytics' ? 'text-brand-navy' : 'text-gray-300'}`}>{t('analytics')}</Text>
-                    </TouchableOpacity>
-                </View>
+                {/* View Mode Tabs - Conditionally Rendered */}
+                {(
+                    (hasAccess('reports') || (hasAccess('reports_transaction') && hasAccess('reports_analysis'))) ||
+                    (isAdmin)
+                ) ? (
+                    <View className="flex-row bg-brand-navy-light/30 p-1 rounded-xl">
+                        <TouchableOpacity
+                            onPress={() => setViewMode('list')}
+                            className={`flex-1 py-2 items-center rounded-lg ${viewMode === 'list' ? 'bg-white' : ''}`}
+                        >
+                            <Text className={`font-bold ${viewMode === 'list' ? 'text-brand-navy' : 'text-gray-300'}`}>{t('transactions')}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={() => setViewMode('analytics')}
+                            className={`flex-1 py-2 items-center rounded-lg ${viewMode === 'analytics' ? 'bg-white' : ''}`}
+                        >
+                            <Text className={`font-bold ${viewMode === 'analytics' ? 'text-brand-navy' : 'text-gray-300'}`}>{t('analytics')}</Text>
+                        </TouchableOpacity>
+                    </View>
+                ) : (
+                    // If restricted to one view, show title of that view instead of tabs
+                    <View className="items-center pb-2">
+                        <Text className="text-white font-bold opacity-80 uppercase tracking-widest text-xs">
+                            {viewMode === 'list' ? t('transactions') : t('analytics')}
+                        </Text>
+                    </View>
+                )}
             </View>
 
             {viewMode === 'list' ? (

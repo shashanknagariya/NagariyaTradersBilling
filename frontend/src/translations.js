@@ -11,6 +11,8 @@ export const translations = {
         newSale: "New Sale",
         inventory: "Inventory",
         reports: "Reports",
+        reports_transaction: "Reports (Transactions)",
+        reports_analysis: "Reports (Analysis)",
         users: "Users",
         logout: "Logout",
         welcome: "Welcome",

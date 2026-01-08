@@ -12,7 +12,15 @@ if DATABASE_URL and "postgres" in DATABASE_URL:
     if DATABASE_URL.startswith("postgres://"):
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
     
-    engine = create_engine(DATABASE_URL, echo=True)
+    # Production DB (Supabase)
+    # limit pool size to avoid "MaxClientsInSessionMode" errors
+    engine = create_engine(
+        DATABASE_URL, 
+        echo=True, 
+        pool_size=5, 
+        max_overflow=0, 
+        pool_pre_ping=True
+    )
     print("Using PostgreSQL Database (Supabase)")
 else:
     # Fallback to Local SQLite

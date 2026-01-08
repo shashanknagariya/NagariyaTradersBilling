@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, Modal, TextInput, Alert, ActivityIndicator, Switch } from 'react-native';
 import client from '../api/client';
 import { useNavigation } from '@react-navigation/native';
+import { useLanguage } from '../context/LanguageContext';
 
 const UserManagementScreen = () => {
     const navigation = useNavigation();
+    const { t } = useLanguage();
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isModalVisible, setModalVisible] = useState(false);
@@ -146,13 +148,13 @@ const UserManagementScreen = () => {
 
                         <Text className="mb-1 text-gray-600">Permissions</Text>
                         <View className="flex-row flex-wrap mb-6">
-                            {['purchase', 'sale', 'inventory', 'reports'].map(p => (
+                            {['purchase', 'sale', 'inventory', 'reports_transaction', 'reports_analysis'].map(p => (
                                 <TouchableOpacity
                                     key={p}
                                     onPress={() => togglePermission(p)}
                                     className={`mr-2 mb-2 px-3 py-1 rounded-full border ${permissions.includes(p) ? 'bg-brand-gold border-brand-gold' : 'border-gray-300'}`}
                                 >
-                                    <Text className={permissions.includes(p) ? 'text-brand-navy font-bold' : 'text-gray-500'}>{p}</Text>
+                                    <Text className={permissions.includes(p) ? 'text-brand-navy font-bold' : 'text-gray-500'}>{t(p)}</Text>
                                 </TouchableOpacity>
                             ))}
                         </View>
