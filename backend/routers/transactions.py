@@ -270,7 +270,7 @@ def get_transaction_bill(transaction_id: int, session: Session = Depends(get_ses
     return [main_trx]
 
 @router.get("/", response_model=List[Transaction])
-def read_transactions(skip: int = 0, limit: int = 100, session: Session = Depends(get_session)):
+def read_transactions(skip: int = 0, limit: int = 2000, session: Session = Depends(get_session)):
     transactions = session.exec(select(Transaction).offset(skip).limit(limit)).all()
     return transactions
 

@@ -1,16 +1,27 @@
 import random
 from datetime import datetime, timedelta
-from sqlmodel import Session, select
+from sqlmodel import Session, select, func, delete
 from database import engine
-from models import Grain, Contact, Warehouse, Transaction
+from models import Grain, Contact, Warehouse, Transaction, PaymentHistory, DispatchInfo
 
 def create_random_date():
     start_date = datetime.now() - timedelta(days=365)
     random_days = random.randrange(365)
     return start_date + timedelta(days=random_days)
 
+def clear_existing_data(session: Session):
+    print("Clearing existing transaction data...")
+    session.exec(delete(PaymentHistory))
+    session.exec(delete(DispatchInfo))
+    session.exec(delete(Transaction))
+    session.commit()
+    print("Data cleared.")
+
 def seed_data():
     with Session(engine) as session:
+        # Clear old data first
+        clear_existing_data(session)
+
         print("Fetching Master Data...")
         grains = session.exec(select(Grain)).all()
         contacts = session.exec(select(Contact)).all()
@@ -22,9 +33,20 @@ def seed_data():
 
         transactions = []
         
+        # Track Inventory: {(grain_id, warehouse_id): quantity_quintal}
+        inventory = {}
+
+        # Track Invoice Numbers
+        # Fetch max current (should be 0 after clear, but good practice)
+        max_p_inv = session.exec(select(func.max(Transaction.invoice_number)).where(Transaction.type == "purchase")).first() or 0
+        max_s_inv = session.exec(select(func.max(Transaction.invoice_number)).where(Transaction.type == "sale")).first() or 0
+        
+        current_p_inv = max_p_inv
+        current_s_inv = max_s_inv
+
         # 1. Purchases
-        print("Generating 1000 Purchases...")
-        for _ in range(1000):
+        print("Generating 500 Purchases...")
+        for _ in range(500):
             grain = random.choice(grains)
             contact = random.choice(contacts)
             warehouse = random.choice(warehouses)
@@ -45,9 +67,12 @@ def seed_data():
             if status == "paid": paid = total_amount
             elif status == "partial": paid = round(total_amount / 2, 2)
             
+            current_p_inv += 1
+
             t = Transaction(
                 date=create_random_date(),
                 type="purchase",
+                invoice_number=current_p_inv,
                 grain_id=grain.id,
                 contact_id=contact.id,
                 warehouse_id=warehouse.id,
@@ -60,31 +85,48 @@ def seed_data():
                 payment_status=status
             )
             transactions.append(t)
+            
+            # Update Inventory
+            key = (grain.id, warehouse.id)
+            inventory[key] = inventory.get(key, 0.0) + qty
 
         # 2. Sales
-        print("Generating 1000 Sales...")
-        for _ in range(1000):
+        print("Generating Sales based on available inventory...")
+        sales_count = 0
+        # Try to generate sales, but skip if no inventory
+        for _ in range(800): # Attempt 800 times, but might produce fewer if stock runs out
             grain = random.choice(grains)
-            contact = random.choice(contacts)
             warehouse = random.choice(warehouses)
             
-            qty = round(random.uniform(10, 200), 2)
-            rate = round(random.uniform(2500, 6000), 2) # Slightly higher than purchase
+            key = (grain.id, warehouse.id)
+            available_stock = inventory.get(key, 0.0)
+            
+            # Skip if no stock or very low stock
+            if available_stock < 1.0:
+                continue
+
+            contact = random.choice(contacts)
+            
+            # Determine Sale Quantity (max 80% of available stock to keep some balance positive)
+            max_qty = min(available_stock, 200.0) # Cap at 200 like purchase
+            qty = round(random.uniform(1.0, max_qty), 2)
+            
+            rate = round(random.uniform(2500, 6000), 2)
             bags = int(qty * 2)
             
             total_amount = round(qty * rate, 2)
             
             # Deductions
-            shortage_qty = round(random.uniform(0, 2), 2) if random.random() > 0.7 else 0
-            deduction_amt = round(random.uniform(0, 1000), 2) if random.random() > 0.8 else 0
+            shortage_qty = round(random.uniform(0, 0.5), 2) if random.random() > 0.8 else 0 # Small shortage
+            deduction_amt = round(random.uniform(0, 500), 2) if random.random() > 0.9 else 0
             
+            current_s_inv += 1
+
             # Costs
             transport_rate = round(random.uniform(20, 100), 2)
-            transport_total = round(qty * transport_rate, 2)
             
-            # Payment (Net Realized logic simplification for seed)
+            # Payment
             net_payable = total_amount - (shortage_qty * rate) - deduction_amt
-            
             status = random.choice(["paid", "pending", "partial"])
             paid = 0
             if status == "paid": paid = net_payable
@@ -93,6 +135,7 @@ def seed_data():
             t = Transaction(
                 date=create_random_date(),
                 type="sale",
+                invoice_number=current_s_inv,
                 grain_id=grain.id,
                 contact_id=contact.id,
                 warehouse_id=warehouse.id,
@@ -109,14 +152,26 @@ def seed_data():
                 vehicle_number=f"MP-{random.randint(10,99)}-{random.randint(1000,9999)}"
             )
             transactions.append(t)
+            sales_count += 1
+            
+            # Deduct from Inventory
+            inventory[key] -= qty
 
+        print(f"Generated {sales_count} Sales.")
         print(f"Committing {len(transactions)} transactions to database...")
         session.add_all(transactions)
+        
+        # Verify Inventory Integrity
+        print("Final Inventory Check (Internal):")
+        for (g_id, w_id), qty in inventory.items():
+            if qty < 0:
+                 print(f"WARNING: Negative Inventory detected for Grain {g_id}, Wh {w_id}: {qty}")
+
         session.commit()
-        print("Success! Database seeded.")
+        print("Success! Database re-seeded.")
 
 if __name__ == "__main__":
-    print("WARNING: This will inject 2000 mock records into your ACTIVE database.")
+    print("WARNING: This will DELETE all existing transactions and inject mock records.")
     confirm = input("Type 'yes' to proceed: ")
     if confirm.lower() == "yes":
         seed_data()
