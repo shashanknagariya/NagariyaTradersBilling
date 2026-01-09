@@ -142,3 +142,11 @@
 2026-01-09 16:20:35,005 - main - INFO - Server starting up...
 2026-01-09 16:20:40,089 - main - INFO - Database initialized.
 2026-01-09 16:42:45,822 - main - INFO - Server shutting down...
+2026-01-09 16:43:09,748 - main - INFO - Server starting up...
+2026-01-09 16:43:14,826 - main - INFO - Database initialized.
+2026-01-09 16:46:21,987 - auth - INFO - Login attempt for user: admin
+2026-01-09 16:46:23,064 - auth - INFO - Login successful for user: admin
+2026-01-09 17:01:25,698 - auth - INFO - Login attempt for user: admin
+2026-01-09 17:01:26,803 - auth - INFO - Login successful for user: admin
+2026-01-09 17:15:03,831 - auth - INFO - Login attempt for user: admin
+2026-01-09 17:15:04,809 - auth - INFO - Login successful for user: admin
