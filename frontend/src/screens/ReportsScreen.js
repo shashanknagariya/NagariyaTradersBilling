@@ -56,6 +56,9 @@ const ReportsScreen = () => {
     const [analyticsEndDate, setAnalyticsEndDate] = useState('');
     const [reportType, setReportType] = useState('profit'); // profit, purchase, sale, transport
 
+    // NEW: Analytics Data
+    const [analyticsData, setAnalyticsData] = useState({ summary: {}, groups: [] });
+
     // Payment Modal State
     const [isPaymentModalVisible, setPaymentModalVisible] = useState(false);
     const [selectedTrx, setSelectedTrx] = useState(null);
@@ -64,20 +67,25 @@ const ReportsScreen = () => {
     useFocusEffect(
         React.useCallback(() => {
             fetchData();
-        }, [])
+        }, [viewMode]) // Re-fetch when switching tabs
     );
 
+    // Re-fetch when analytics filters change
     useEffect(() => {
-        fetchData();
-    }, [reportType]);
+        if (viewMode === 'analytics') {
+            fetchAnalytics();
+        }
+    }, [reportType, groupBy, analyticsStartDate, analyticsEndDate, viewMode]);
 
     const fetchData = async () => {
         setLoading(true);
         try {
-            if (reportType === 'transport') {
+            if (viewMode === 'analytics' && reportType === 'transport') {
+                // Transport report logic remains same (or move to analytics later)
                 const res = await client.get('/reports/transport');
                 setTransportData(res.data);
-            } else {
+            } else if (viewMode === 'list') {
+                // List View: Fetch raw transactions (with limit)
                 const tRes = await client.get('/transactions/');
                 const gRes = await client.get('/master/grains');
                 const cRes = await client.get('/master/contacts');
@@ -101,6 +109,35 @@ const ReportsScreen = () => {
         }
     };
 
+    const fetchAnalytics = async () => {
+        setLoading(true);
+        try {
+            if (reportType === 'transport') {
+                const res = await client.get('/reports/transport');
+                setTransportData(res.data);
+                return;
+            }
+
+            const payload = {
+                report_type: reportType,
+                group_by: groupBy,
+                start_date: analyticsStartDate || null,
+                end_date: analyticsEndDate || null,
+                status: 'all', // Can add status filter later
+                search_query: null
+            };
+
+            const res = await client.post('/analytics/query', payload);
+            setAnalyticsData(res.data);
+
+        } catch (e) {
+            console.error(e);
+            Alert.alert("Error", "Failed to load analytics");
+        } finally {
+            setLoading(false);
+        }
+    }
+
     // Transport Filtered Data
     const filteredTransportData = useMemo(() => {
         if (reportType !== 'transport') return [];
@@ -119,191 +156,108 @@ const ReportsScreen = () => {
 
     const reportData = useMemo(() => {
         if (viewMode !== 'analytics') return [];
-        if (reportType === 'transport') return filteredTransportData; // Use transport data
+        if (reportType === 'transport') return filteredTransportData;
 
-        // Helper
-
-        const getNetTotal = (t) => {
-            if (t.type === 'purchase') return t.total_amount;
-            // For sale, subtract deductions
-            const shortageVal = (t.shortage_quantity || 0) * t.rate_per_quintal;
-            const deduct = t.deduction_amount || 0;
-            return t.total_amount - shortageVal - deduct;
-        };
-
-        // 1. Filter
-        let data = transactions.filter(t => {
-            if (reportType === 'profit' && t.type !== 'sale') return false;
-            // ... (rest same)
-            if (reportType === 'sale' && t.type !== 'sale') return false;
-            if (reportType === 'purchase' && t.type !== 'purchase') return false;
-
-            if (analyticsStartDate) {
-                const s = new Date(analyticsStartDate); s.setHours(0, 0, 0, 0);
-                if (new Date(t.date).getTime() < s.getTime()) return false;
-            }
-            if (analyticsEndDate) {
-                const e = new Date(analyticsEndDate); e.setHours(23, 59, 59, 999);
-                if (new Date(t.date).getTime() > e.getTime()) return false;
-            }
-            return true;
-        });
-
-        // 2. Map Extended Fields
-        data = data.map(t => {
-            const qty = t.quantity_quintal || 0;
-            const rate = t.rate_per_quintal || 0;
-            const bags = t.number_of_bags || 0;
-
-            const baseAmount = qty * rate;
-
-            // Costs
-            const shortageCost = (t.shortage_quantity || 0) * rate;
-            const deductionCost = t.deduction_amount || 0;
-            const labourCostTotal = bags * (t.labour_cost_per_bag || 0);
-            const transportCostTotal = qty * (t.transport_cost_per_qtl || 0);
-            const mandiCostTotal = t.mandi_cost || 0;
-
-            // Net Realized (Revenue - Expenses)
-            const netRealized = baseAmount - shortageCost - deductionCost - labourCostTotal - transportCostTotal - mandiCostTotal;
-
-            // Payment Status
-            const paidAmount = t.amount_paid || 0;
-            // effectiveTotal is Party Payable, Mandi Cost is internal expense (like labour/transport usually)
-            const effectiveTotal = baseAmount - shortageCost - deductionCost;
-            const pendingAmount = effectiveTotal - paidAmount;
-
-            let status = 'Pending';
-            if (paidAmount >= effectiveTotal - 1.0) status = 'Paid';
-            else if (paidAmount > 0) status = 'Partial';
-
-            // Profit (Net Realized - Cost)
-            const profit = (t.type === 'sale')
-                ? netRealized - ((t.cost_price_per_quintal || 0) * qty)
-                : 0;
-
-            return {
-                ...t,
-                contactName: contacts[t.contact_id] || 'Unknown',
-                grainName: grains[t.grain_id] || 'Unknown',
-                warehouseName: warehouses[t.warehouse_id] || 'Unknown',
-                baseAmount,
-                shortageCost,
-                deductionCost,
-                labourCostTotal,
-                transportCostTotal,
-                netRealized,
-                effectiveTotal,
-                paidAmount,
-                pendingAmount,
-                status,
-                profit
-            };
-        });
-
-        // 3. Grouping
+        // Use backend data
         if (groupBy !== 'none') {
-            const groups = {};
-            data.forEach(t => {
-                let groupKey = 'Unknown';
-                if (groupBy === 'grain') groupKey = t.grainName;
-                if (groupBy === 'party') groupKey = t.contactName;
-                if (groupBy === 'warehouse') groupKey = t.warehouseName;
-
-                if (!groups[groupKey]) {
-                    groups[groupKey] = { name: groupKey, qty: 0, amount: 0, profit: 0, paid: 0, pending: 0, count: 0 };
-                }
-                groups[groupKey].qty += t.quantity_quintal;
-                groups[groupKey].amount += t.netRealized;
-                groups[groupKey].profit += t.profit;
-                groups[groupKey].paid += t.paidAmount;
-                groups[groupKey].pending += t.pendingAmount;
-                groups[groupKey].count += 1;
-            });
-            return Object.values(groups);
+            return analyticsData.groups || [];
         }
 
-        return data;
-    }, [transactions, viewMode, reportType, analyticsStartDate, analyticsEndDate, groupBy, contacts, grains, warehouses, filteredTransportData]);
+        // Detailed List (from backend rows)
+        return analyticsData.rows || [];
+
+    }, [analyticsData, viewMode, reportType, filteredTransportData, groupBy]);
 
     const downloadCsv = async () => {
-        if (reportData.length === 0) { Alert.alert("No Data"); return; }
-
-        let headers = [];
-        let rows = [];
-
-        if (groupBy !== 'none') {
-            headers = ['Group Name', 'Count', 'Total Qty', 'Total Amount', 'Paid', 'Pending', 'Total Profit'];
-            rows = reportData.map(d => [d.name, d.count, d.qty.toFixed(2), d.amount.toFixed(2), d.paid.toFixed(2), d.pending.toFixed(2), d.profit.toFixed(2)]);
-        } else if (reportType === 'transport') {
-            headers = ['Date', 'Invoice', 'Transporter', 'Vehicle', 'Weight', 'Rate', 'Total Freight', 'Advance', 'Delivery Paid', 'Deductions', 'Pending', 'Status'];
-            rows = reportData.map(d => [
-                new Date(d.date).toLocaleDateString().replace(/,/g, ''),
-                d.invoice_number || '-',
-                `"${d.transporter_name}"`,
-                d.vehicle_number || '-',
-                d.total_weight.toFixed(2),
-                d.rate.toFixed(2),
-                d.gross_freight.toFixed(2),
-                d.advance_paid.toFixed(2),
-                d.delivery_paid.toFixed(2),
-                d.total_deduction.toFixed(2),
-                d.balance_pending.toFixed(2),
-                d.status
-            ]);
-        } else {
-            headers = ['Date', 'Invoice', 'Party', 'Grain', 'Bags', 'Qty', 'Rate', 'Gross', 'Short', 'Ded', 'Lab', 'Trans', 'Mandi', 'Net Realized', 'Paid', 'Pending', 'Status'];
-            if (reportType === 'profit') { headers.push('Avg Cost'); headers.push('Profit'); }
-
-            rows = reportData.map(d => {
-                let r = [
+        setLoading(true);
+        try {
+            if (viewMode === 'analytics' && reportType === 'transport') {
+                // Keep client side for transport for now (or move to backend later)
+                // Revert to client-side logic for transport ONLY
+                // ... existing client CSV logic for transport ...
+                let headers = ['Date', 'Invoice', 'Transporter', 'Vehicle', 'Weight', 'Rate', 'Total Freight', 'Advance', 'Delivery Paid', 'Deductions', 'Pending', 'Status'];
+                let rows = reportData.map(d => [
                     new Date(d.date).toLocaleDateString().replace(/,/g, ''),
                     d.invoice_number || '-',
-                    `"${d.contactName}"`,
-                    `"${d.grainName}"`,
-                    (d.number_of_bags || 0).toString(),
-                    d.quantity_quintal.toFixed(2),
-                    d.rate_per_quintal.toFixed(2),
-                    d.baseAmount.toFixed(2),
-                    d.shortageCost.toFixed(2),
-                    d.deductionCost.toFixed(2),
-                    d.labourCostTotal.toFixed(2),
-                    d.transportCostTotal.toFixed(2),
-                    (d.mandi_cost || 0).toFixed(2),
-                    d.netRealized.toFixed(2),
-                    d.paidAmount.toFixed(2),
-                    d.pendingAmount.toFixed(2),
+                    `"${d.transporter_name}"`,
+                    d.vehicle_number || '-',
+                    d.total_weight.toFixed(2),
+                    d.rate.toFixed(2),
+                    d.gross_freight.toFixed(2),
+                    d.advance_paid.toFixed(2),
+                    d.delivery_paid.toFixed(2),
+                    d.total_deduction.toFixed(2),
+                    d.balance_pending.toFixed(2),
                     d.status
-                ];
-                if (reportType === 'profit') {
-                    r.push((d.cost_price_per_quintal || 0).toFixed(2));
-                    r.push(d.profit.toFixed(2));
+                ]);
+                const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+                // Download logic...
+                const filename = `report_transport_${Date.now()}.csv`;
+                if (Platform.OS === 'web') {
+                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement("a");
+                    link.href = url;
+                    link.download = filename;
+                    link.click();
+                } else {
+                    const fileUri = FileSystem.documentDirectory + filename;
+                    await FileSystem.writeAsStringAsync(fileUri, csvContent, { encoding: FileSystem.EncodingType.UTF8 });
+                    await Sharing.shareAsync(fileUri);
                 }
-                return r;
+                return;
+            }
+
+            // Backend Export for Others
+            const payload = {
+                report_type: reportType,
+                group_by: groupBy,
+                start_date: analyticsStartDate || null,
+                end_date: analyticsEndDate || null,
+                status: 'all',
+                search_query: null
+            };
+
+            // For Web, we open the URL directly or fetch blob
+            // For Mobile, we fetch blob and save
+
+            // Construct filters as query params not easy with POST. 
+            // We need to use axios to download blob.
+            const response = await client.post('/analytics/export', payload, {
+                responseType: 'blob' // Important
             });
-        }
 
-        const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+            const blob = new Blob([response.data], { type: 'text/csv' });
 
-        try {
             if (Platform.OS === 'web') {
-                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                const link = document.createElement("a");
-                const url = URL.createObjectURL(blob);
-                link.setAttribute("href", url);
-                link.setAttribute("download", `report_${reportType}_${new Date().toISOString().slice(0, 10)}.csv`);
-                link.style.visibility = 'hidden';
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.setAttribute('download', `report_${reportType}.csv`);
                 document.body.appendChild(link);
                 link.click();
-                document.body.removeChild(link);
+                link.remove();
             } else {
-                const fileUri = FileSystem.documentDirectory + `report_${reportType}_${Date.now()}.csv`;
-                await FileSystem.writeAsStringAsync(fileUri, csvContent, { encoding: FileSystem.EncodingType.UTF8 });
-                await Sharing.shareAsync(fileUri);
+                // For Expo/Mobile, we might need a workaround as client.post returns blob string or base64?
+                // Actually axios in RN returns raw string usually. 
+                // Let's use FileSystem.downloadAsync if possible? No, it's POST.
+
+                // Read blob as base64
+                const reader = new FileReader();
+                reader.onload = async () => {
+                    const base64data = reader.result.split(',')[1];
+                    const fileUri = FileSystem.documentDirectory + `report_${reportType}_${Date.now()}.csv`;
+                    await FileSystem.writeAsStringAsync(fileUri, base64data, { encoding: FileSystem.EncodingType.Base64 });
+                    await Sharing.shareAsync(fileUri);
+                };
+                reader.readAsDataURL(blob);
             }
+
         } catch (e) {
             console.error(e);
-            Alert.alert("Error", "Failed to export CSV: " + e.message);
+            Alert.alert("Error", "Failed to export CSV");
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -411,6 +365,10 @@ const ReportsScreen = () => {
                         <th>Paid</th>
                         <th>Pending</th>
                         <th>Status</th>
+                        ${reportType === 'profit' ? `
+                            <th>Avg Cost</th>
+                            <th>Profit</th>
+                        ` : ''}
                     </tr>
                 </thead>
                 <tbody>
@@ -434,6 +392,10 @@ const ReportsScreen = () => {
                         <td>${d.paidAmount.toFixed(0)}</td>
                         <td>${d.pendingAmount.toFixed(0)}</td>
                         <td>${d.status}</td>
+                        ${reportType === 'profit' ? `
+                            <td>${(d.cost_price_per_quintal || 0).toFixed(2)}</td>
+                            <td>${d.profit.toFixed(2)}</td>
+                        ` : ''}
                     </tr>
                 `;
             });
@@ -853,275 +815,239 @@ const ReportsScreen = () => {
             ) : (
                 <View className="flex-1 px-4">
                     {/* Analytics Config */}
-                    <View className="bg-white p-4 rounded-xl shadow-sm mb-4">
-                        <Text className="font-bold text-gray-700 mb-2">{t('reportSettings')}</Text>
-                        <View className="flex-row mb-4 flex-wrap">
-                            {['profit', 'purchase', 'sale', 'transport'].map(tVal => (
+                    {/* Filters & Controls */}
+                    <View className="flex-row items-center justify-between px-4 mb-4">
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
+                            {['profit', 'purchase', 'sale', 'transport'].map(type => (
                                 <TouchableOpacity
-                                    key={tVal}
-                                    onPress={() => setReportType(tVal)}
-                                    className={`mr-2 mb-2 px-3 py-1 rounded-lg border ${reportType === tVal ? 'bg-brand-navy border-brand-navy' : 'bg-gray-50 border-gray-200'}`}
+                                    key={type}
+                                    onPress={() => setReportType(type)}
+                                    className={`mr-2 px-4 py-2 rounded-full border ${reportType === type ? 'bg-brand-navy border-brand-navy' : 'bg-white border-gray-300'}`}
                                 >
-                                    <Text className={`capitalize font-bold ${reportType === tVal ? 'text-white' : 'text-gray-600'}`}>
-                                        {tVal === 'transport' ? t('transportAnalysis') : t(tVal)}
-                                    </Text>
+                                    <Text className={`font-bold capitalize ${reportType === type ? 'text-white' : 'text-gray-600'}`}>{t(type)}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                        <TouchableOpacity onPress={downloadCsv} className="bg-green-600 px-3 py-2 rounded-lg ml-2">
+                            <Text className="text-white font-bold text-xs">{t('downloadCsv')}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={downloadPdf} className="bg-red-600 px-3 py-2 rounded-lg ml-2">
+                            <Text className="text-white font-bold text-xs">{t('downloadPdf')}</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Additional Filters Row */}
+                    {reportType !== 'transport' && (
+                        <View className="flex-row px-4 mb-4 items-center">
+                            <Text className="text-gray-500 font-bold mr-2">{t('groupBy')}:</Text>
+                            {['none', 'grain', 'party', 'warehouse'].map(g => (
+                                <TouchableOpacity
+                                    key={g}
+                                    onPress={() => setGroupBy(g)}
+                                    className={`mr-2 px-3 py-1 rounded-lg border ${groupBy === g ? 'bg-brand-gold border-brand-gold' : 'bg-white border-gray-300'}`}
+                                >
+                                    <Text className={`text-xs font-bold capitalize ${groupBy === g ? 'text-brand-navy' : 'text-gray-600'}`}>{g === 'none' ? t('none') : t(g)}</Text>
                                 </TouchableOpacity>
                             ))}
                         </View>
+                    )}
 
-                        {reportType !== 'transport' && (
-                            <View className="flex-row mb-4 items-center">
-                                <Text className="mr-2 text-gray-500">{t('groupBy')}:</Text>
-                                {['none', 'grain', 'party', 'warehouse'].map(g => (
-                                    <TouchableOpacity
-                                        key={g}
-                                        onPress={() => setGroupBy(g)}
-                                        className={`mr-2 px-2 py-1 rounded border ${groupBy === g ? 'bg-brand-gold border-brand-gold' : 'bg-gray-50 border-gray-200'}`}
-                                    >
-                                        <Text className={`capitalize text-xs font-bold ${groupBy === g ? 'text-brand-navy' : 'text-gray-500'}`}>{t(g)}</Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-                        )}
-
-                        <View className="flex-row space-x-2 mb-4">
-                            {Platform.OS === 'web' ? (
-                                <input
-                                    type="date"
-                                    value={analyticsStartDate}
-                                    onChange={(e) => setAnalyticsStartDate(e.target.value)}
-                                    onClick={(e) => e.target.showPicker()}
-                                    className="flex-1 bg-gray-50 p-2 rounded border border-gray-200 text-xs"
-                                    placeholder={t('startDate')}
-                                    style={{
-                                        padding: 8,
-                                        borderRadius: 4,
-                                        border: '1px solid #e5e7eb',
-                                        fontSize: 12,
-                                        backgroundColor: '#f9fafb',
-                                        width: '48%',
-                                        boxSizing: 'border-box'
-                                    }}
-                                />
-                            ) : (
-                                <TextInput
-                                    className="flex-1 bg-gray-50 p-2 rounded border border-gray-200 text-xs"
-                                    placeholder={t('startDate')}
-                                    value={analyticsStartDate}
-                                    onChangeText={setAnalyticsStartDate}
-                                />
-                            )}
-
-                            {Platform.OS === 'web' ? (
-                                <input
-                                    type="date"
-                                    value={analyticsEndDate}
-                                    onChange={(e) => setAnalyticsEndDate(e.target.value)}
-                                    onClick={(e) => e.target.showPicker()}
-                                    className="flex-1 bg-gray-50 p-2 rounded border border-gray-200 text-xs"
-                                    placeholder={t('endDate')}
-                                    style={{
-                                        padding: 8,
-                                        borderRadius: 4,
-                                        border: '1px solid #e5e7eb',
-                                        fontSize: 12,
-                                        backgroundColor: '#f9fafb',
-                                        width: '48%',
-                                        boxSizing: 'border-box'
-                                    }}
-                                />
-                            ) : (
-                                <TextInput
-                                    className="flex-1 bg-gray-50 p-2 rounded border border-gray-200 text-xs"
-                                    placeholder={t('endDate')}
-                                    value={analyticsEndDate}
-                                    onChangeText={setAnalyticsEndDate}
-                                />
-                            )}
-                        </View>
-
-                        <View className="flex-row space-x-2">
-                            <TouchableOpacity onPress={downloadCsv} className="bg-green-600 flex-1 p-3 rounded-lg flex-row justify-center items-center">
-                                <Text className="text-white font-bold">In Excel (CSV)</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity onPress={downloadPdf} className="bg-red-600 flex-1 p-3 rounded-lg flex-row justify-center items-center">
-                                <Text className="text-white font-bold">In PDF</Text>
-                            </TouchableOpacity>
-                        </View>
+                    {/* Date Filters */}
+                    <View className="flex-row px-4 mb-4 space-x-2">
+                        <TextInput
+                            className="flex-1 bg-white p-2 rounded-lg border border-gray-200"
+                            placeholder={t('startDate') + " (YYYY-MM-DD)"}
+                            value={analyticsStartDate}
+                            onChangeText={setAnalyticsStartDate}
+                        />
+                        <TextInput
+                            className="flex-1 bg-white p-2 rounded-lg border border-gray-200"
+                            placeholder={t('endDate') + " (YYYY-MM-DD)"}
+                            value={analyticsEndDate}
+                            onChangeText={setAnalyticsEndDate}
+                        />
                     </View>
 
-                    {/* Data Table */}
-                    <ScrollView className="flex-1 bg-white rounded-xl shadow-sm mb-4">
-                        <ScrollView horizontal>
-                            <View className="p-4">
-                                {/* Header */}
-                                <View className="flex-row border-b border-gray-200 pb-2 mb-2">
-                                    {groupBy !== 'none' ? (
-                                        <>
-                                            <Text className="font-bold w-32 text-gray-700">{t('groupName')}</Text>
-                                            <Text className="font-bold w-16 text-right text-gray-700">{t('count')}</Text>
-                                            <Text className="font-bold w-24 text-right text-gray-700">{t('totalWeight')}</Text>
-                                            <Text className="font-bold w-24 text-right text-gray-700">{t('totalAmount')}</Text>
-                                            <Text className="font-bold w-24 text-right text-brand-navy">{t('paid')}</Text>
-                                            <Text className="font-bold w-24 text-right text-red-600">{t('pending')}</Text>
-                                            <Text className="font-bold w-24 text-right text-gray-700">{t('total')} {t('profit')}</Text>
-                                        </>
-                                    ) : (
-                                        reportType === 'transport' ? (
-                                            <>
-                                                <Text className="font-bold w-20 text-gray-700">{t('colDate')}</Text>
-                                                <Text className="font-bold w-16 text-gray-700">{t('colInvoice')}</Text>
-                                                <Text className="font-bold w-28 text-gray-700">{t('colTransporter')}</Text>
-                                                <Text className="font-bold w-20 text-gray-700">{t('colVehicle')}</Text>
-                                                <Text className="font-bold w-16 text-right text-gray-700">{t('colWeight')}</Text>
-                                                <Text className="font-bold w-16 text-right text-gray-700">{t('colRate')}</Text>
-                                                <Text className="font-bold w-20 text-right text-brand-navy">{t('colFreight')}</Text>
-                                                <Text className="font-bold w-20 text-right text-green-700">{t('colAdvance')}</Text>
-                                                <Text className="font-bold w-20 text-right text-green-700">{t('colDelivery')}</Text>
-                                                <Text className="font-bold w-16 text-right text-orange-600">{t('colDeduction')}</Text>
-                                                <Text className="font-bold w-20 text-right text-red-600">{t('colPending')}</Text>
-                                                <Text className="font-bold w-16 text-center text-gray-700">{t('colStatus')}</Text>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Text className="font-bold w-20 text-gray-700">{t('date')}</Text>
-                                                <Text className="font-bold w-16 text-gray-700">{t('invoice')}</Text>
-                                                <Text className="font-bold w-28 text-gray-700">{t('buyer')}/{t('supplier')}</Text>
-                                                <Text className="font-bold w-20 text-gray-700">{t('selectGrain')}</Text>
-                                                <Text className="font-bold w-12 text-right text-gray-700">Qty</Text>
-                                                <Text className="font-bold w-12 text-right text-gray-700">Rate</Text>
-                                                <Text className="font-bold w-20 text-right text-brand-navy">{t('gross')}</Text>
-                                                <Text className="font-bold w-16 text-right text-orange-600">{t('shortage')}</Text>
-                                                <Text className="font-bold w-16 text-right text-orange-600">{t('deduction')}</Text>
-                                                <Text className="font-bold w-16 text-right text-orange-600">{t('labour')}</Text>
-                                                <Text className="font-bold w-16 text-right text-orange-600">{t('transport')}</Text>
-                                                <Text className="font-bold w-12 text-right text-gray-700">Mandi</Text>
-                                                <Text className="font-bold w-20 text-right text-brand-navy">{t('net')}</Text>
-                                                <Text className="font-bold w-20 text-right text-green-700">{t('paid')}</Text>
-                                                <Text className="font-bold w-20 text-right text-red-600">{t('pending')}</Text>
-                                                <Text className="font-bold w-16 text-center text-gray-700">{t('status')}</Text>
-                                                {reportType === 'profit' && (
-                                                    <Text className="font-bold w-16 text-right text-gray-700">{t('profit')}</Text>
+                    {loading ? (
+                        <ActivityIndicator size="large" color="#1e1b4b" className="mt-10" />
+                    ) : (
+                        <ScrollView horizontal contentContainerStyle={{ flexGrow: 1 }}>
+                            <View className="px-4 pb-20 min-w-full">
+                                <View className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                                    <ScrollView horizontal>
+                                        <View className="p-4">
+                                            {/* Header */}
+                                            <View className="flex-row border-b border-gray-200 pb-2 mb-2">
+                                                {groupBy !== 'none' ? (
+                                                    <>
+                                                        <Text className="font-bold w-32 text-gray-700">{t('groupName')}</Text>
+                                                        <Text className="font-bold w-16 text-right text-gray-700">{t('count')}</Text>
+                                                        <Text className="font-bold w-24 text-right text-gray-700">{t('totalWeight')}</Text>
+                                                        <Text className="font-bold w-24 text-right text-gray-700">{t('totalAmount')}</Text>
+                                                        <Text className="font-bold w-24 text-right text-brand-navy">{t('paid')}</Text>
+                                                        <Text className="font-bold w-24 text-right text-red-600">{t('pending')}</Text>
+                                                        <Text className="font-bold w-24 text-right text-gray-700">{t('total')} {t('profit')}</Text>
+                                                    </>
+                                                ) : (
+                                                    reportType === 'transport' ? (
+                                                        <>
+                                                            <Text className="font-bold w-20 text-gray-700">{t('colDate')}</Text>
+                                                            <Text className="font-bold w-16 text-gray-700">{t('colInvoice')}</Text>
+                                                            <Text className="font-bold w-28 text-gray-700">{t('colTransporter')}</Text>
+                                                            <Text className="font-bold w-20 text-gray-700">{t('colVehicle')}</Text>
+                                                            <Text className="font-bold w-16 text-right text-gray-700">{t('colWeight')}</Text>
+                                                            <Text className="font-bold w-16 text-right text-gray-700">{t('colRate')}</Text>
+                                                            <Text className="font-bold w-20 text-right text-brand-navy">{t('colFreight')}</Text>
+                                                            <Text className="font-bold w-20 text-right text-green-700">{t('colAdvance')}</Text>
+                                                            <Text className="font-bold w-20 text-right text-green-700">{t('colDelivery')}</Text>
+                                                            <Text className="font-bold w-16 text-right text-orange-600">{t('colDeduction')}</Text>
+                                                            <Text className="font-bold w-20 text-right text-red-600">{t('colPending')}</Text>
+                                                            <Text className="font-bold w-16 text-center text-gray-700">{t('colStatus')}</Text>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Text className="font-bold w-20 text-gray-700">{t('date')}</Text>
+                                                            <Text className="font-bold w-16 text-gray-700">{t('invoice')}</Text>
+                                                            <Text className="font-bold w-28 text-gray-700">{t('buyer')}/{t('supplier')}</Text>
+                                                            <Text className="font-bold w-20 text-gray-700">{t('selectGrain')}</Text>
+                                                            <Text className="font-bold w-12 text-right text-gray-700">Qty</Text>
+                                                            <Text className="font-bold w-12 text-right text-gray-700">Rate</Text>
+                                                            <Text className="font-bold w-20 text-right text-brand-navy">{t('gross')}</Text>
+                                                            <Text className="font-bold w-16 text-right text-orange-600">{t('shortage')}</Text>
+                                                            <Text className="font-bold w-16 text-right text-orange-600">{t('deduction')}</Text>
+                                                            <Text className="font-bold w-16 text-right text-orange-600">{t('labour')}</Text>
+                                                            <Text className="font-bold w-16 text-right text-orange-600">{t('transport')}</Text>
+                                                            <Text className="font-bold w-12 text-right text-gray-700">Mandi</Text>
+                                                            <Text className="font-bold w-20 text-right text-brand-navy">{t('net')}</Text>
+                                                            <Text className="font-bold w-20 text-right text-green-700">{t('paid')}</Text>
+                                                            <Text className="font-bold w-20 text-right text-red-600">{t('pending')}</Text>
+                                                            <Text className="font-bold w-16 text-center text-gray-700">{t('status')}</Text>
+                                                            {reportType === 'profit' && (
+                                                                <Text className="font-bold w-16 text-right text-gray-700">{t('profit')}</Text>
+                                                            )}
+                                                        </>
+                                                    )
                                                 )}
-                                            </>
-                                        )
-                                    )}
+                                            </View>
+
+                                            {/* Rows */}
+                                            {reportData.map((d, i) => (
+                                                <View key={i} className="flex-row border-b border-gray-100 py-2">
+                                                    {groupBy !== 'none' ? (
+                                                        <>
+                                                            <Text className="w-32 text-brand-navy font-semibold text-xs">{d.name || 'All'}</Text>
+                                                            <Text className="w-16 text-right text-xs">{d.count}</Text>
+                                                            <Text className="w-24 text-right text-xs">{d.qty.toFixed(2)}</Text>
+                                                            <Text className="w-24 text-right text-xs">₹{d.amount.toFixed(0)}</Text>
+                                                            <Text className="w-24 text-right text-xs text-green-700">₹{d.paid.toFixed(0)}</Text>
+                                                            <Text className="w-24 text-right text-xs text-red-600">₹{d.pending.toFixed(0)}</Text>
+                                                            <Text className={`w-24 text-right text-xs font-bold ${d.profit >= 0 ? 'text-green-600' : 'text-red-500'}`}>{d.profit.toFixed(0)}</Text>
+                                                        </>
+                                                    ) : (
+                                                        reportType === 'transport' ? (
+                                                            <>
+                                                                <Text className="w-20 text-xs">{new Date(d.date).toLocaleDateString()}</Text>
+                                                                <Text className="w-16 text-xs">{d.invoice_number}</Text>
+                                                                <Text className="w-28 text-xs">{d.transporter_name}</Text>
+                                                                <Text className="w-20 text-xs" numberOfLines={1}>{d.vehicle_number || '-'}</Text>
+                                                                <Text className="w-16 text-right text-xs">{d.total_weight.toFixed(2)}</Text>
+                                                                <Text className="w-16 text-right text-xs">{d.rate.toFixed(0)}</Text>
+                                                                <Text className="w-20 text-right text-xs font-bold text-brand-navy">{d.gross_freight.toFixed(0)}</Text>
+                                                                <Text className="w-20 text-right text-xs text-green-700">{d.advance_paid.toFixed(0)}</Text>
+                                                                <Text className="w-20 text-right text-xs text-green-700">{d.delivery_paid.toFixed(0)}</Text>
+                                                                <Text className="w-16 text-right text-xs text-orange-600">{d.total_deduction.toFixed(0)}</Text>
+                                                                <Text className="w-20 text-right text-xs text-red-600">{d.balance_pending.toFixed(0)}</Text>
+                                                                <Text className={`w-16 text-center text-xs font-bold ${d.status === 'Paid' ? 'text-green-600' : d.status === 'Partial' ? 'text-orange-500' : 'text-red-500'}`}>{d.status}</Text>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Text className="w-20 text-xs">{new Date(d.date).toLocaleDateString()}</Text>
+                                                                <Text className="w-16 text-xs">{d.invoice_number}</Text>
+                                                                <Text className="w-28 text-xs" numberOfLines={1}>{d.contactName}</Text>
+                                                                <Text className="w-20 text-xs" numberOfLines={1}>{d.grainName}</Text>
+                                                                <Text className="w-12 text-right text-xs">{d.quantity_quintal.toFixed(0)}</Text>
+                                                                <Text className="w-12 text-right text-xs">{d.rate_per_quintal.toFixed(0)}</Text>
+                                                                <Text className="w-20 text-right text-xs font-bold text-brand-navy">{d.baseAmount.toFixed(0)}</Text>
+                                                                <Text className="w-16 text-right text-xs text-orange-600">{d.shortageCost.toFixed(0)}</Text>
+                                                                <Text className="w-16 text-right text-xs text-orange-600">{d.deductionCost.toFixed(0)}</Text>
+                                                                <Text className="w-16 text-right text-xs text-orange-600">{d.labourCostTotal.toFixed(0)}</Text>
+                                                                <Text className="w-16 text-right text-xs text-orange-600">{d.transportCostTotal.toFixed(0)}</Text>
+                                                                <Text className="w-12 text-right text-xs">{(d.mandi_cost || 0).toFixed(0)}</Text>
+                                                                <Text className="w-20 text-right text-xs font-bold text-brand-navy">{d.netRealized.toFixed(0)}</Text>
+                                                                <Text className="w-20 text-right text-xs text-green-700">{d.paidAmount.toFixed(0)}</Text>
+                                                                <Text className="w-20 text-right text-xs text-red-600">{d.pendingAmount.toFixed(0)}</Text>
+                                                                <Text className={`w-16 text-center text-xs font-bold ${d.status === 'Paid' ? 'text-green-600' : d.status === 'Partial' ? 'text-orange-500' : 'text-red-500'}`}>{d.status}</Text>
+                                                                {reportType === 'profit' && (
+                                                                    <Text className={`w-16 text-right text-xs font-bold ${d.profit >= 0 ? 'text-green-600' : 'text-red-500'}`}>{d.profit.toFixed(0)}</Text>
+                                                                )}
+                                                            </>
+                                                        )
+                                                    )}
+                                                </View>
+                                            ))}
+
+                                            {/* Total Row */}
+                                            {reportData.length > 0 && (
+                                                <View className="flex-row border-t-2 border-brand-navy py-2 mt-2 bg-gray-50">
+                                                    {groupBy !== 'none' ? (
+                                                        <>
+                                                            <Text className="w-32 font-bold text-brand-navy">TOTAL</Text>
+                                                            <Text className="w-16 text-right font-bold">{reportData.reduce((sum, d) => sum + d.count, 0)}</Text>
+                                                            <Text className="w-24 text-right font-bold">{reportData.reduce((sum, d) => sum + (d.qty || 0), 0).toFixed(2)}</Text>
+                                                            <Text className="w-24 text-right font-bold">₹{reportData.reduce((sum, d) => sum + (d.amount || 0), 0).toFixed(0)}</Text>
+                                                            <Text className="w-24 text-right font-bold text-green-700">₹{reportData.reduce((sum, d) => sum + (d.paid || 0), 0).toFixed(0)}</Text>
+                                                            <Text className="w-24 text-right font-bold text-red-600">₹{reportData.reduce((sum, d) => sum + (d.pending || 0), 0).toFixed(0)}</Text>
+                                                            <Text className="w-24 text-right font-bold">₹{reportData.reduce((sum, d) => sum + (d.profit || 0), 0).toFixed(0)}</Text>
+                                                        </>
+                                                    ) : (
+                                                        reportType === 'transport' ? (
+                                                            <>
+                                                                <Text className="w-20 font-bold"></Text> {/* Date */}
+                                                                <Text className="w-16 font-bold"></Text> {/* Inv */}
+                                                                <Text className="w-28 font-bold text-brand-navy">TOTAL</Text> {/* Transporter */}
+                                                                <Text className="w-20 font-bold"></Text> {/* Vehicle */}
+                                                                <Text className="w-16 text-right font-bold">{reportData.reduce((sum, d) => sum + d.total_weight, 0).toFixed(2)}</Text>
+                                                                <Text className="w-16 font-bold"></Text> {/* Rate */}
+                                                                <Text className="w-20 text-right font-bold text-brand-navy">{reportData.reduce((sum, d) => sum + d.gross_freight, 0).toFixed(0)}</Text>
+                                                                <Text className="w-20 text-right font-bold text-green-700">{reportData.reduce((sum, d) => sum + d.advance_paid, 0).toFixed(0)}</Text>
+                                                                <Text className="w-20 text-right font-bold text-green-700">{reportData.reduce((sum, d) => sum + d.delivery_paid, 0).toFixed(0)}</Text>
+                                                                <Text className="w-16 text-right font-bold text-orange-600">{reportData.reduce((sum, d) => sum + d.total_deduction, 0).toFixed(0)}</Text>
+                                                                <Text className="w-20 text-right font-bold text-red-600">{reportData.reduce((sum, d) => sum + d.balance_pending, 0).toFixed(0)}</Text>
+                                                                <Text className="w-16 font-bold"></Text> {/* Status */}
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Text className="w-20 font-bold"></Text> {/* Date */}
+                                                                <Text className="w-16 font-bold"></Text> {/* Inv */}
+                                                                <Text className="w-28 font-bold text-brand-navy">TOTAL</Text> {/* Party */}
+                                                                <Text className="w-20 font-bold"></Text> {/* Grain */}
+                                                                <Text className="w-12 text-right font-bold">{reportData.reduce((sum, d) => sum + d.quantity_quintal, 0).toFixed(2)}</Text>
+                                                                <Text className="w-12 font-bold"></Text> {/* Rate */}
+                                                                <Text className="w-20 text-right font-bold text-brand-navy">{reportData.reduce((sum, d) => sum + d.baseAmount, 0).toFixed(0)}</Text>
+                                                                <Text className="w-16 text-right font-bold text-orange-600">{reportData.reduce((sum, d) => sum + d.shortageCost, 0).toFixed(0)}</Text>
+                                                                <Text className="w-16 text-right font-bold text-orange-600">{reportData.reduce((sum, d) => sum + d.deductionCost, 0).toFixed(0)}</Text>
+                                                                <Text className="w-16 text-right font-bold text-orange-600">{reportData.reduce((sum, d) => sum + d.labourCostTotal, 0).toFixed(0)}</Text>
+                                                                <Text className="w-16 text-right font-bold text-orange-600">{reportData.reduce((sum, d) => sum + d.transportCostTotal, 0).toFixed(0)}</Text>
+                                                                <Text className="w-12 text-right font-bold">{reportData.reduce((sum, d) => sum + (d.mandi_cost || 0), 0).toFixed(0)}</Text>
+                                                                <Text className="w-20 text-right font-bold text-brand-navy">{reportData.reduce((sum, d) => sum + d.netRealized, 0).toFixed(0)}</Text>
+                                                                <Text className="w-20 text-right font-bold text-green-700">{reportData.reduce((sum, d) => sum + d.paidAmount, 0).toFixed(0)}</Text>
+                                                                <Text className="w-20 text-right font-bold text-red-600">{reportData.reduce((sum, d) => sum + d.pendingAmount, 0).toFixed(0)}</Text>
+                                                                <Text className="w-16 font-bold"></Text> {/* Status */}
+                                                                {reportType === 'profit' && (
+                                                                    <Text className="w-16 text-right font-bold">{reportData.reduce((sum, d) => sum + d.profit, 0).toFixed(0)}</Text>
+                                                                )}
+                                                            </>
+                                                        )
+                                                    )}
+                                                </View>
+                                            )}
+                                        </View>
+                                    </ScrollView>
                                 </View>
-
-                                {/* Rows */}
-                                {reportData.map((d, i) => (
-                                    <View key={i} className="flex-row border-b border-gray-100 py-2">
-                                        {groupBy !== 'none' ? (
-                                            <>
-                                                <Text className="w-32 text-brand-navy font-semibold text-xs">{d.name}</Text>
-                                                <Text className="w-16 text-right text-xs">{d.count}</Text>
-                                                <Text className="w-24 text-right text-xs">{d.qty.toFixed(2)}</Text>
-                                                <Text className="w-24 text-right text-xs">₹{d.amount.toFixed(0)}</Text>
-                                                <Text className="w-24 text-right text-xs text-green-700">₹{d.paid.toFixed(0)}</Text>
-                                                <Text className="w-24 text-right text-xs text-red-600">₹{d.pending.toFixed(0)}</Text>
-                                                <Text className={`w-24 text-right text-xs font-bold ${d.profit >= 0 ? 'text-green-600' : 'text-red-500'}`}>{d.profit.toFixed(0)}</Text>
-                                            </>
-                                        ) : (
-                                            reportType === 'transport' ? (
-                                                <>
-                                                    <Text className="w-20 text-xs">{new Date(d.date).toLocaleDateString()}</Text>
-                                                    <Text className="w-16 text-xs">{d.invoice_number}</Text>
-                                                    <Text className="w-28 text-xs">{d.transporter_name}</Text>
-                                                    <Text className="w-20 text-xs" numberOfLines={1}>{d.vehicle_number || '-'}</Text>
-                                                    <Text className="w-16 text-right text-xs">{d.total_weight.toFixed(2)}</Text>
-                                                    <Text className="w-16 text-right text-xs">{d.rate.toFixed(0)}</Text>
-                                                    <Text className="w-20 text-right text-xs font-bold text-brand-navy">{d.gross_freight.toFixed(0)}</Text>
-                                                    <Text className="w-20 text-right text-xs text-green-700">{d.advance_paid.toFixed(0)}</Text>
-                                                    <Text className="w-20 text-right text-xs text-green-700">{d.delivery_paid.toFixed(0)}</Text>
-                                                    <Text className="w-16 text-right text-xs text-orange-600">{d.total_deduction.toFixed(0)}</Text>
-                                                    <Text className="w-20 text-right text-xs text-red-600">{d.balance_pending.toFixed(0)}</Text>
-                                                    <Text className={`w-16 text-center text-xs font-bold ${d.status === 'Paid' ? 'text-green-600' : d.status === 'Partial' ? 'text-orange-500' : 'text-red-500'}`}>{d.status}</Text>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Text className="w-20 text-xs">{new Date(d.date).toLocaleDateString()}</Text>
-                                                    <Text className="w-16 text-xs">{d.invoice_number}</Text>
-                                                    <Text className="w-28 text-xs" numberOfLines={1}>{d.contactName}</Text>
-                                                    <Text className="w-20 text-xs" numberOfLines={1}>{d.grainName}</Text>
-                                                    <Text className="w-12 text-right text-xs">{d.quantity_quintal.toFixed(0)}</Text>
-                                                    <Text className="w-12 text-right text-xs">{d.rate_per_quintal.toFixed(0)}</Text>
-                                                    <Text className="w-20 text-right text-xs font-bold text-brand-navy">{d.baseAmount.toFixed(0)}</Text>
-                                                    <Text className="w-16 text-right text-xs text-orange-600">{d.shortageCost.toFixed(0)}</Text>
-                                                    <Text className="w-16 text-right text-xs text-orange-600">{d.deductionCost.toFixed(0)}</Text>
-                                                    <Text className="w-16 text-right text-xs text-orange-600">{d.labourCostTotal.toFixed(0)}</Text>
-                                                    <Text className="w-16 text-right text-xs text-orange-600">{d.transportCostTotal.toFixed(0)}</Text>
-                                                    <Text className="w-12 text-right text-xs">{(d.mandi_cost || 0).toFixed(0)}</Text>
-                                                    <Text className="w-20 text-right text-xs font-bold text-brand-navy">{d.netRealized.toFixed(0)}</Text>
-                                                    <Text className="w-20 text-right text-xs text-green-700">{d.paidAmount.toFixed(0)}</Text>
-                                                    <Text className="w-20 text-right text-xs text-red-600">{d.pendingAmount.toFixed(0)}</Text>
-                                                    <Text className={`w-16 text-center text-xs font-bold ${d.status === 'Paid' ? 'text-green-600' : d.status === 'Partial' ? 'text-orange-500' : 'text-red-500'}`}>{d.status}</Text>
-                                                    {reportType === 'profit' && (
-                                                        <Text className={`w-16 text-right text-xs font-bold ${d.profit >= 0 ? 'text-green-600' : 'text-red-500'}`}>{d.profit.toFixed(0)}</Text>
-                                                    )}
-                                                </>
-                                            )
-                                        )}
-                                    </View>
-                                ))}
-
-                                {/* Total Row */}
-                                {reportData.length > 0 && (
-                                    <View className="flex-row border-t-2 border-brand-navy py-2 mt-2 bg-gray-50">
-                                        {groupBy !== 'none' ? (
-                                            <>
-                                                <Text className="w-32 font-bold text-brand-navy">TOTAL</Text>
-                                                <Text className="w-16 text-right font-bold">{reportData.reduce((sum, d) => sum + d.count, 0)}</Text>
-                                                <Text className="w-24 text-right font-bold">{reportData.reduce((sum, d) => sum + d.qty, 0).toFixed(2)}</Text>
-                                                <Text className="w-24 text-right font-bold">₹{reportData.reduce((sum, d) => sum + d.amount, 0).toFixed(0)}</Text>
-                                                <Text className="w-24 text-right font-bold text-green-700">₹{reportData.reduce((sum, d) => sum + d.paid, 0).toFixed(0)}</Text>
-                                                <Text className="w-24 text-right font-bold text-red-600">₹{reportData.reduce((sum, d) => sum + d.pending, 0).toFixed(0)}</Text>
-                                                <Text className="w-24 text-right font-bold">₹{reportData.reduce((sum, d) => sum + d.profit, 0).toFixed(0)}</Text>
-                                            </>
-                                        ) : (
-                                            reportType === 'transport' ? (
-                                                <>
-                                                    <Text className="w-20 font-bold"></Text> {/* Date */}
-                                                    <Text className="w-16 font-bold"></Text> {/* Inv */}
-                                                    <Text className="w-28 font-bold text-brand-navy">TOTAL</Text> {/* Transporter */}
-                                                    <Text className="w-20 font-bold"></Text> {/* Vehicle */}
-                                                    <Text className="w-16 text-right font-bold">{reportData.reduce((sum, d) => sum + d.total_weight, 0).toFixed(2)}</Text>
-                                                    <Text className="w-16 font-bold"></Text> {/* Rate */}
-                                                    <Text className="w-20 text-right font-bold text-brand-navy">{reportData.reduce((sum, d) => sum + d.gross_freight, 0).toFixed(0)}</Text>
-                                                    <Text className="w-20 text-right font-bold text-green-700">{reportData.reduce((sum, d) => sum + d.advance_paid, 0).toFixed(0)}</Text>
-                                                    <Text className="w-20 text-right font-bold text-green-700">{reportData.reduce((sum, d) => sum + d.delivery_paid, 0).toFixed(0)}</Text>
-                                                    <Text className="w-16 text-right font-bold text-orange-600">{reportData.reduce((sum, d) => sum + d.total_deduction, 0).toFixed(0)}</Text>
-                                                    <Text className="w-20 text-right font-bold text-red-600">{reportData.reduce((sum, d) => sum + d.balance_pending, 0).toFixed(0)}</Text>
-                                                    <Text className="w-16 font-bold"></Text> {/* Status */}
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Text className="w-20 font-bold"></Text> {/* Date */}
-                                                    <Text className="w-16 font-bold"></Text> {/* Inv */}
-                                                    <Text className="w-28 font-bold text-brand-navy">TOTAL</Text> {/* Party */}
-                                                    <Text className="w-20 font-bold"></Text> {/* Grain */}
-                                                    <Text className="w-12 text-right font-bold">{reportData.reduce((sum, d) => sum + d.quantity_quintal, 0).toFixed(2)}</Text>
-                                                    <Text className="w-12 font-bold"></Text> {/* Rate */}
-                                                    <Text className="w-20 text-right font-bold text-brand-navy">{reportData.reduce((sum, d) => sum + d.baseAmount, 0).toFixed(0)}</Text>
-                                                    <Text className="w-16 text-right font-bold text-orange-600">{reportData.reduce((sum, d) => sum + d.shortageCost, 0).toFixed(0)}</Text>
-                                                    <Text className="w-16 text-right font-bold text-orange-600">{reportData.reduce((sum, d) => sum + d.deductionCost, 0).toFixed(0)}</Text>
-                                                    <Text className="w-16 text-right font-bold text-orange-600">{reportData.reduce((sum, d) => sum + d.labourCostTotal, 0).toFixed(0)}</Text>
-                                                    <Text className="w-16 text-right font-bold text-orange-600">{reportData.reduce((sum, d) => sum + d.transportCostTotal, 0).toFixed(0)}</Text>
-                                                    <Text className="w-12 text-right font-bold">{reportData.reduce((sum, d) => sum + (d.mandi_cost || 0), 0).toFixed(0)}</Text>
-                                                    <Text className="w-20 text-right font-bold text-brand-navy">{reportData.reduce((sum, d) => sum + d.netRealized, 0).toFixed(0)}</Text>
-                                                    <Text className="w-20 text-right font-bold text-green-700">{reportData.reduce((sum, d) => sum + d.paidAmount, 0).toFixed(0)}</Text>
-                                                    <Text className="w-20 text-right font-bold text-red-600">{reportData.reduce((sum, d) => sum + d.pendingAmount, 0).toFixed(0)}</Text>
-                                                    <Text className="w-16 font-bold"></Text> {/* Status */}
-                                                    {reportType === 'profit' && (
-                                                        <Text className="w-16 text-right font-bold">{reportData.reduce((sum, d) => sum + d.profit, 0).toFixed(0)}</Text>
-                                                    )}
-                                                </>
-                                            )
-                                        )}
-                                    </View>
-                                )}
                             </View>
                         </ScrollView>
-                    </ScrollView>
+                    )
+                    }
                 </View>
             )}
 
@@ -1260,7 +1186,7 @@ const ReportsScreen = () => {
                     </View>
                 </View>
             </Modal>
-        </View>
+        </View >
     );
 };
 

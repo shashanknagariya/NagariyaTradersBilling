@@ -1,0 +1,11 @@
+INFO: Found 1050 transactions.
+Verifying invoice numbers...
+PASS: All transactions have invoice numbers.
+
+GLOBAL STATS:
+Total Purchased: 54483.00 Qtl
+Total Sold: 54481.30 Qtl
+Remaining Stock: 1.70 Qtl
+
+Verifying Inventory...
+PASS: No negative inventory found.
