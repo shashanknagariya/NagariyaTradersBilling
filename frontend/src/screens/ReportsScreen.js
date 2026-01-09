@@ -816,24 +816,31 @@ const ReportsScreen = () => {
                 <View className="flex-1 px-4">
                     {/* Analytics Config */}
                     {/* Filters & Controls */}
-                    <View className="flex-row items-center justify-between px-4 mb-4">
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
-                            {['profit', 'purchase', 'sale', 'transport'].map(type => (
-                                <TouchableOpacity
-                                    key={type}
-                                    onPress={() => setReportType(type)}
-                                    className={`mr-2 px-4 py-2 rounded-full border ${reportType === type ? 'bg-brand-navy border-brand-navy' : 'bg-white border-gray-300'}`}
-                                >
-                                    <Text className={`font-bold capitalize ${reportType === type ? 'text-white' : 'text-gray-600'}`}>{t(type)}</Text>
-                                </TouchableOpacity>
-                            ))}
-                        </ScrollView>
-                        <TouchableOpacity onPress={downloadCsv} className="bg-green-600 px-3 py-2 rounded-lg ml-2">
-                            <Text className="text-white font-bold text-xs">{t('downloadCsv')}</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={downloadPdf} className="bg-red-600 px-3 py-2 rounded-lg ml-2">
-                            <Text className="text-white font-bold text-xs">{t('downloadPdf')}</Text>
-                        </TouchableOpacity>
+                    <View>
+                        {/* Report Tabs */}
+                        <View className="px-4 mb-3">
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
+                                {['profit', 'purchase', 'sale', 'transport'].map(type => (
+                                    <TouchableOpacity
+                                        key={type}
+                                        onPress={() => setReportType(type)}
+                                        className={`mr-2 px-4 py-2 rounded-full border ${reportType === type ? 'bg-brand-navy border-brand-navy' : 'bg-white border-gray-300'}`}
+                                    >
+                                        <Text className={`font-bold capitalize ${reportType === type ? 'text-white' : 'text-gray-600'}`}>{t(type)}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        </View>
+
+                        {/* Download Actions */}
+                        <View className="flex-row px-4 mb-4 space-x-2">
+                            <TouchableOpacity onPress={downloadCsv} className="flex-1 bg-green-600 px-3 py-2 rounded-lg items-center">
+                                <Text className="text-white font-bold text-xs">{t('downloadCsv')}</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={downloadPdf} className="flex-1 bg-red-600 px-3 py-2 rounded-lg items-center">
+                                <Text className="text-white font-bold text-xs">{t('downloadPdf')}</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
 
                     {/* Additional Filters Row */}
@@ -871,13 +878,17 @@ const ReportsScreen = () => {
                     {loading ? (
                         <ActivityIndicator size="large" color="#1e1b4b" className="mt-10" />
                     ) : (
-                        <ScrollView horizontal contentContainerStyle={{ flexGrow: 1 }}>
-                            <View className="px-4 pb-20 min-w-full">
-                                <View className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                                    <ScrollView horizontal>
-                                        <View className="p-4">
-                                            {/* Header */}
-                                            <View className="flex-row border-b border-gray-200 pb-2 mb-2">
+                        <View className="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-4">
+                            <ScrollView horizontal contentContainerStyle={{ flexGrow: 1 }}>
+                                <View style={{ minWidth: 1000 }}>
+                                    <FlatList
+                                        data={reportData}
+                                        keyExtractor={(item, index) => index.toString()}
+                                        initialNumToRender={20}
+                                        maxToRenderPerBatch={20}
+                                        windowSize={10}
+                                        ListHeaderComponent={
+                                            <View className="flex-row border-b border-gray-200 p-4 bg-gray-50">
                                                 {groupBy !== 'none' ? (
                                                     <>
                                                         <Text className="font-bold w-32 text-gray-700">{t('groupName')}</Text>
@@ -930,69 +941,68 @@ const ReportsScreen = () => {
                                                 )}
                                             </View>
 
-                                            {/* Rows */}
-                                            {reportData.map((d, i) => (
-                                                <View key={i} className="flex-row border-b border-gray-100 py-2">
-                                                    {groupBy !== 'none' ? (
+                                        }
+                                        renderItem={({ item: d }) => (
+                                            <View className="flex-row border-b border-gray-100 px-4 py-2">
+                                                {groupBy !== 'none' ? (
+                                                    <>
+                                                        <Text className="w-32 text-brand-navy font-semibold text-xs">{d.name || 'All'}</Text>
+                                                        <Text className="w-16 text-right text-xs">{(d.count || 0)}</Text>
+                                                        <Text className="w-24 text-right text-xs">{(d.qty || 0).toFixed(2)}</Text>
+                                                        <Text className="w-24 text-right text-xs">₹{(d.amount || 0).toFixed(0)}</Text>
+                                                        <Text className="w-24 text-right text-xs text-green-700">₹{(d.paid || 0).toFixed(0)}</Text>
+                                                        <Text className="w-24 text-right text-xs text-red-600">₹{(d.pending || 0).toFixed(0)}</Text>
+                                                        <Text className={`w-24 text-right text-xs font-bold ${(d.profit || 0) >= 0 ? 'text-green-600' : 'text-red-500'}`}>{(d.profit || 0).toFixed(0)}</Text>
+                                                    </>
+                                                ) : (
+                                                    reportType === 'transport' ? (
                                                         <>
-                                                            <Text className="w-32 text-brand-navy font-semibold text-xs">{d.name || 'All'}</Text>
-                                                            <Text className="w-16 text-right text-xs">{d.count}</Text>
-                                                            <Text className="w-24 text-right text-xs">{d.qty.toFixed(2)}</Text>
-                                                            <Text className="w-24 text-right text-xs">₹{d.amount.toFixed(0)}</Text>
-                                                            <Text className="w-24 text-right text-xs text-green-700">₹{d.paid.toFixed(0)}</Text>
-                                                            <Text className="w-24 text-right text-xs text-red-600">₹{d.pending.toFixed(0)}</Text>
-                                                            <Text className={`w-24 text-right text-xs font-bold ${d.profit >= 0 ? 'text-green-600' : 'text-red-500'}`}>{d.profit.toFixed(0)}</Text>
+                                                            <Text className="w-20 text-xs">{d.date ? new Date(d.date).toLocaleDateString() : '-'}</Text>
+                                                            <Text className="w-16 text-xs">{d.invoice_number || '-'}</Text>
+                                                            <Text className="w-28 text-xs">{d.transporter_name || '-'}</Text>
+                                                            <Text className="w-20 text-xs" numberOfLines={1}>{d.vehicle_number || '-'}</Text>
+                                                            <Text className="w-16 text-right text-xs">{(d.total_weight || 0).toFixed(2)}</Text>
+                                                            <Text className="w-16 text-right text-xs">{(d.rate || 0).toFixed(0)}</Text>
+                                                            <Text className="w-20 text-right text-xs font-bold text-brand-navy">{(d.gross_freight || 0).toFixed(0)}</Text>
+                                                            <Text className="w-20 text-right text-xs text-green-700">{(d.advance_paid || 0).toFixed(0)}</Text>
+                                                            <Text className="w-20 text-right text-xs text-green-700">{(d.delivery_paid || 0).toFixed(0)}</Text>
+                                                            <Text className="w-16 text-right text-xs text-orange-600">{(d.total_deduction || 0).toFixed(0)}</Text>
+                                                            <Text className="w-20 text-right text-xs text-red-600">{(d.balance_pending || 0).toFixed(0)}</Text>
+                                                            <Text className={`w-16 text-center text-xs font-bold ${d.status === 'Paid' ? 'text-green-600' : d.status === 'Partial' ? 'text-orange-500' : 'text-red-500'}`}>{d.status || 'Pending'}</Text>
                                                         </>
                                                     ) : (
-                                                        reportType === 'transport' ? (
-                                                            <>
-                                                                <Text className="w-20 text-xs">{new Date(d.date).toLocaleDateString()}</Text>
-                                                                <Text className="w-16 text-xs">{d.invoice_number}</Text>
-                                                                <Text className="w-28 text-xs">{d.transporter_name}</Text>
-                                                                <Text className="w-20 text-xs" numberOfLines={1}>{d.vehicle_number || '-'}</Text>
-                                                                <Text className="w-16 text-right text-xs">{d.total_weight.toFixed(2)}</Text>
-                                                                <Text className="w-16 text-right text-xs">{d.rate.toFixed(0)}</Text>
-                                                                <Text className="w-20 text-right text-xs font-bold text-brand-navy">{d.gross_freight.toFixed(0)}</Text>
-                                                                <Text className="w-20 text-right text-xs text-green-700">{d.advance_paid.toFixed(0)}</Text>
-                                                                <Text className="w-20 text-right text-xs text-green-700">{d.delivery_paid.toFixed(0)}</Text>
-                                                                <Text className="w-16 text-right text-xs text-orange-600">{d.total_deduction.toFixed(0)}</Text>
-                                                                <Text className="w-20 text-right text-xs text-red-600">{d.balance_pending.toFixed(0)}</Text>
-                                                                <Text className={`w-16 text-center text-xs font-bold ${d.status === 'Paid' ? 'text-green-600' : d.status === 'Partial' ? 'text-orange-500' : 'text-red-500'}`}>{d.status}</Text>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <Text className="w-20 text-xs">{new Date(d.date).toLocaleDateString()}</Text>
-                                                                <Text className="w-16 text-xs">{d.invoice_number}</Text>
-                                                                <Text className="w-28 text-xs" numberOfLines={1}>{d.contactName}</Text>
-                                                                <Text className="w-20 text-xs" numberOfLines={1}>{d.grainName}</Text>
-                                                                <Text className="w-12 text-right text-xs">{d.quantity_quintal.toFixed(0)}</Text>
-                                                                <Text className="w-12 text-right text-xs">{d.rate_per_quintal.toFixed(0)}</Text>
-                                                                <Text className="w-20 text-right text-xs font-bold text-brand-navy">{d.baseAmount.toFixed(0)}</Text>
-                                                                <Text className="w-16 text-right text-xs text-orange-600">{d.shortageCost.toFixed(0)}</Text>
-                                                                <Text className="w-16 text-right text-xs text-orange-600">{d.deductionCost.toFixed(0)}</Text>
-                                                                <Text className="w-16 text-right text-xs text-orange-600">{d.labourCostTotal.toFixed(0)}</Text>
-                                                                <Text className="w-16 text-right text-xs text-orange-600">{d.transportCostTotal.toFixed(0)}</Text>
-                                                                <Text className="w-12 text-right text-xs">{(d.mandi_cost || 0).toFixed(0)}</Text>
-                                                                <Text className="w-20 text-right text-xs font-bold text-brand-navy">{d.netRealized.toFixed(0)}</Text>
-                                                                <Text className="w-20 text-right text-xs text-green-700">{d.paidAmount.toFixed(0)}</Text>
-                                                                <Text className="w-20 text-right text-xs text-red-600">{d.pendingAmount.toFixed(0)}</Text>
-                                                                <Text className={`w-16 text-center text-xs font-bold ${d.status === 'Paid' ? 'text-green-600' : d.status === 'Partial' ? 'text-orange-500' : 'text-red-500'}`}>{d.status}</Text>
-                                                                {reportType === 'profit' && (
-                                                                    <Text className={`w-16 text-right text-xs font-bold ${d.profit >= 0 ? 'text-green-600' : 'text-red-500'}`}>{d.profit.toFixed(0)}</Text>
-                                                                )}
-                                                            </>
-                                                        )
-                                                    )}
-                                                </View>
-                                            ))}
-
-                                            {/* Total Row */}
-                                            {reportData.length > 0 && (
-                                                <View className="flex-row border-t-2 border-brand-navy py-2 mt-2 bg-gray-50">
+                                                        <>
+                                                            <Text className="w-20 text-xs">{d.date ? new Date(d.date).toLocaleDateString() : '-'}</Text>
+                                                            <Text className="w-16 text-xs">{d.invoice_number || '-'}</Text>
+                                                            <Text className="w-28 text-xs" numberOfLines={1}>{d.contactName || '-'}</Text>
+                                                            <Text className="w-20 text-xs" numberOfLines={1}>{d.grainName || '-'}</Text>
+                                                            <Text className="w-12 text-right text-xs">{(d.quantity_quintal || 0).toFixed(0)}</Text>
+                                                            <Text className="w-12 text-right text-xs">{(d.rate_per_quintal || 0).toFixed(0)}</Text>
+                                                            <Text className="w-20 text-right text-xs font-bold text-brand-navy">{(d.baseAmount || 0).toFixed(0)}</Text>
+                                                            <Text className="w-16 text-right text-xs text-orange-600">{(d.shortageCost || 0).toFixed(0)}</Text>
+                                                            <Text className="w-16 text-right text-xs text-orange-600">{(d.deductionCost || 0).toFixed(0)}</Text>
+                                                            <Text className="w-16 text-right text-xs text-orange-600">{(d.labourCostTotal || 0).toFixed(0)}</Text>
+                                                            <Text className="w-16 text-right text-xs text-orange-600">{(d.transportCostTotal || 0).toFixed(0)}</Text>
+                                                            <Text className="w-12 text-right text-xs">{(d.mandi_cost || 0).toFixed(0)}</Text>
+                                                            <Text className="w-20 text-right text-xs font-bold text-brand-navy">{(d.netRealized || 0).toFixed(0)}</Text>
+                                                            <Text className="w-20 text-right text-xs text-green-700">{(d.paidAmount || 0).toFixed(0)}</Text>
+                                                            <Text className="w-20 text-right text-xs text-red-600">{(d.pendingAmount || 0).toFixed(0)}</Text>
+                                                            <Text className={`w-16 text-center text-xs font-bold ${d.status === 'Paid' ? 'text-green-600' : d.status === 'Partial' ? 'text-orange-500' : 'text-red-500'}`}>{d.status || 'Pending'}</Text>
+                                                            {reportType === 'profit' && (
+                                                                <Text className={`w-16 text-right text-xs font-bold ${(d.profit || 0) >= 0 ? 'text-green-600' : 'text-red-500'}`}>{(d.profit || 0).toFixed(0)}</Text>
+                                                            )}
+                                                        </>
+                                                    )
+                                                )}
+                                            </View>
+                                        )}
+                                        ListFooterComponent={
+                                            reportData.length > 0 && (
+                                                <View className="flex-row border-t-2 border-brand-navy p-4 bg-gray-50">
                                                     {groupBy !== 'none' ? (
                                                         <>
                                                             <Text className="w-32 font-bold text-brand-navy">TOTAL</Text>
-                                                            <Text className="w-16 text-right font-bold">{reportData.reduce((sum, d) => sum + d.count, 0)}</Text>
+                                                            <Text className="w-16 text-right font-bold">{reportData.reduce((sum, d) => sum + (d.count || 0), 0)}</Text>
                                                             <Text className="w-24 text-right font-bold">{reportData.reduce((sum, d) => sum + (d.qty || 0), 0).toFixed(2)}</Text>
                                                             <Text className="w-24 text-right font-bold">₹{reportData.reduce((sum, d) => sum + (d.amount || 0), 0).toFixed(0)}</Text>
                                                             <Text className="w-24 text-right font-bold text-green-700">₹{reportData.reduce((sum, d) => sum + (d.paid || 0), 0).toFixed(0)}</Text>
@@ -1002,52 +1012,51 @@ const ReportsScreen = () => {
                                                     ) : (
                                                         reportType === 'transport' ? (
                                                             <>
-                                                                <Text className="w-20 font-bold"></Text> {/* Date */}
-                                                                <Text className="w-16 font-bold"></Text> {/* Inv */}
-                                                                <Text className="w-28 font-bold text-brand-navy">TOTAL</Text> {/* Transporter */}
-                                                                <Text className="w-20 font-bold"></Text> {/* Vehicle */}
-                                                                <Text className="w-16 text-right font-bold">{reportData.reduce((sum, d) => sum + d.total_weight, 0).toFixed(2)}</Text>
-                                                                <Text className="w-16 font-bold"></Text> {/* Rate */}
-                                                                <Text className="w-20 text-right font-bold text-brand-navy">{reportData.reduce((sum, d) => sum + d.gross_freight, 0).toFixed(0)}</Text>
-                                                                <Text className="w-20 text-right font-bold text-green-700">{reportData.reduce((sum, d) => sum + d.advance_paid, 0).toFixed(0)}</Text>
-                                                                <Text className="w-20 text-right font-bold text-green-700">{reportData.reduce((sum, d) => sum + d.delivery_paid, 0).toFixed(0)}</Text>
-                                                                <Text className="w-16 text-right font-bold text-orange-600">{reportData.reduce((sum, d) => sum + d.total_deduction, 0).toFixed(0)}</Text>
-                                                                <Text className="w-20 text-right font-bold text-red-600">{reportData.reduce((sum, d) => sum + d.balance_pending, 0).toFixed(0)}</Text>
-                                                                <Text className="w-16 font-bold"></Text> {/* Status */}
+                                                                <Text className="w-20 font-bold"></Text>
+                                                                <Text className="w-16 font-bold"></Text>
+                                                                <Text className="w-28 font-bold text-brand-navy">TOTAL</Text>
+                                                                <Text className="w-20 font-bold"></Text>
+                                                                <Text className="w-16 text-right font-bold">{reportData.reduce((sum, d) => sum + (d.total_weight || 0), 0).toFixed(2)}</Text>
+                                                                <Text className="w-16 font-bold"></Text>
+                                                                <Text className="w-20 text-right font-bold text-brand-navy">{reportData.reduce((sum, d) => sum + (d.gross_freight || 0), 0).toFixed(0)}</Text>
+                                                                <Text className="w-20 text-right font-bold text-green-700">{reportData.reduce((sum, d) => sum + (d.advance_paid || 0), 0).toFixed(0)}</Text>
+                                                                <Text className="w-20 text-right font-bold text-green-700">{reportData.reduce((sum, d) => sum + (d.delivery_paid || 0), 0).toFixed(0)}</Text>
+                                                                <Text className="w-16 text-right font-bold text-orange-600">{reportData.reduce((sum, d) => sum + (d.total_deduction || 0), 0).toFixed(0)}</Text>
+                                                                <Text className="w-20 text-right font-bold text-red-600">{reportData.reduce((sum, d) => sum + (d.balance_pending || 0), 0).toFixed(0)}</Text>
+                                                                <Text className="w-16 font-bold"></Text>
                                                             </>
                                                         ) : (
                                                             <>
-                                                                <Text className="w-20 font-bold"></Text> {/* Date */}
-                                                                <Text className="w-16 font-bold"></Text> {/* Inv */}
-                                                                <Text className="w-28 font-bold text-brand-navy">TOTAL</Text> {/* Party */}
-                                                                <Text className="w-20 font-bold"></Text> {/* Grain */}
-                                                                <Text className="w-12 text-right font-bold">{reportData.reduce((sum, d) => sum + d.quantity_quintal, 0).toFixed(2)}</Text>
-                                                                <Text className="w-12 font-bold"></Text> {/* Rate */}
-                                                                <Text className="w-20 text-right font-bold text-brand-navy">{reportData.reduce((sum, d) => sum + d.baseAmount, 0).toFixed(0)}</Text>
-                                                                <Text className="w-16 text-right font-bold text-orange-600">{reportData.reduce((sum, d) => sum + d.shortageCost, 0).toFixed(0)}</Text>
-                                                                <Text className="w-16 text-right font-bold text-orange-600">{reportData.reduce((sum, d) => sum + d.deductionCost, 0).toFixed(0)}</Text>
-                                                                <Text className="w-16 text-right font-bold text-orange-600">{reportData.reduce((sum, d) => sum + d.labourCostTotal, 0).toFixed(0)}</Text>
-                                                                <Text className="w-16 text-right font-bold text-orange-600">{reportData.reduce((sum, d) => sum + d.transportCostTotal, 0).toFixed(0)}</Text>
+                                                                <Text className="w-20 font-bold"></Text>
+                                                                <Text className="w-16 font-bold"></Text>
+                                                                <Text className="w-28 font-bold text-brand-navy">TOTAL</Text>
+                                                                <Text className="w-20 font-bold"></Text>
+                                                                <Text className="w-12 text-right font-bold">{reportData.reduce((sum, d) => sum + (d.quantity_quintal || 0), 0).toFixed(2)}</Text>
+                                                                <Text className="w-12 font-bold"></Text>
+                                                                <Text className="w-20 text-right font-bold text-brand-navy">{reportData.reduce((sum, d) => sum + (d.baseAmount || 0), 0).toFixed(0)}</Text>
+                                                                <Text className="w-16 text-right font-bold text-orange-600">{reportData.reduce((sum, d) => sum + (d.shortageCost || 0), 0).toFixed(0)}</Text>
+                                                                <Text className="w-16 text-right font-bold text-orange-600">{reportData.reduce((sum, d) => sum + (d.deductionCost || 0), 0).toFixed(0)}</Text>
+                                                                <Text className="w-16 text-right font-bold text-orange-600">{reportData.reduce((sum, d) => sum + (d.labourCostTotal || 0), 0).toFixed(0)}</Text>
+                                                                <Text className="w-16 text-right font-bold text-orange-600">{reportData.reduce((sum, d) => sum + (d.transportCostTotal || 0), 0).toFixed(0)}</Text>
                                                                 <Text className="w-12 text-right font-bold">{reportData.reduce((sum, d) => sum + (d.mandi_cost || 0), 0).toFixed(0)}</Text>
-                                                                <Text className="w-20 text-right font-bold text-brand-navy">{reportData.reduce((sum, d) => sum + d.netRealized, 0).toFixed(0)}</Text>
-                                                                <Text className="w-20 text-right font-bold text-green-700">{reportData.reduce((sum, d) => sum + d.paidAmount, 0).toFixed(0)}</Text>
-                                                                <Text className="w-20 text-right font-bold text-red-600">{reportData.reduce((sum, d) => sum + d.pendingAmount, 0).toFixed(0)}</Text>
-                                                                <Text className="w-16 font-bold"></Text> {/* Status */}
+                                                                <Text className="w-20 text-right font-bold text-brand-navy">{reportData.reduce((sum, d) => sum + (d.netRealized || 0), 0).toFixed(0)}</Text>
+                                                                <Text className="w-20 text-right font-bold text-green-700">{reportData.reduce((sum, d) => sum + (d.paidAmount || 0), 0).toFixed(0)}</Text>
+                                                                <Text className="w-20 text-right font-bold text-red-600">{reportData.reduce((sum, d) => sum + (d.pendingAmount || 0), 0).toFixed(0)}</Text>
+                                                                <Text className="w-16 font-bold"></Text>
                                                                 {reportType === 'profit' && (
-                                                                    <Text className="w-16 text-right font-bold">{reportData.reduce((sum, d) => sum + d.profit, 0).toFixed(0)}</Text>
+                                                                    <Text className="w-16 text-right font-bold">{reportData.reduce((sum, d) => sum + (d.profit || 0), 0).toFixed(0)}</Text>
                                                                 )}
                                                             </>
                                                         )
                                                     )}
                                                 </View>
-                                            )}
-                                        </View>
-                                    </ScrollView>
+                                            )
+                                        }
+                                    />
                                 </View>
-                            </View>
-                        </ScrollView>
-                    )
-                    }
+                            </ScrollView>
+                        </View>
+                    )}
                 </View>
             )}
 
