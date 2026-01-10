@@ -8,6 +8,7 @@ class Grain(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True, unique=True)  # Wheat, Rice, etc.
     hindi_name: Optional[str] = None # Gehu, Chana
+    standard_bharti: float = Field(default=60.0)
 
 class Warehouse(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -41,6 +42,7 @@ class Transaction(SQLModel, table=True):
     amount_paid: float = Field(default=0.0)
     payment_status: str = Field(default="pending") # pending, paid, partial
     notes: Optional[str] = None
+    extra_loose_quantity: float = Field(default=0.0)
 
     # Sale specific details
     transporter_name: Optional[str] = None
@@ -96,6 +98,7 @@ class TransactionCreate(SQLModel):
     shortage_quantity: Optional[float] = 0.0
     deduction_amount: Optional[float] = 0.0
     deduction_note: Optional[str] = None
+    extra_loose_quantity: Optional[float] = 0.0
 
 class TransactionUpdate(SQLModel):
     date: Optional[datetime] = None

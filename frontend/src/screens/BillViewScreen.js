@@ -148,6 +148,10 @@ const BillViewScreen = () => {
 
         const isIntraState = (partyState.code === '23');
 
+        // Dynamic Colspans
+        const footerColSpan = isPurchase ? 6 : 5;
+        const subTotalColSpan = isPurchase ? 4 : 3;
+
         // Rows HTML
         const rowsHtml = billData.map((item, index) => {
             // const wh = warehouses[item.warehouse_id]?.name || 'Unknown'; // User requested to remove warehouse name
@@ -160,7 +164,7 @@ const BillViewScreen = () => {
                     <td style="text-align: center;">${index + 1}</td>
                     <td>${grain.name} (${grain.hindi_name || ''})</td>
                     <td style="text-align: center;">${item.number_of_bags || '-'}</td>
-                    <td style="text-align: center;">${bharti}</td>
+                    ${isPurchase ? `<td style="text-align: center;">${bharti}</td>` : ''}
                     <td style="text-align: right;">${item.quantity_quintal.toFixed(2)} QTL</td>
                     <td style="text-align: right;">${item.rate_per_quintal.toFixed(2)}</td>
                     <td style="text-align: right;">${(item.quantity_quintal * item.rate_per_quintal).toFixed(2)}</td>
@@ -173,7 +177,7 @@ const BillViewScreen = () => {
         if (paymentHistory.length > 0) {
             paymentRows = paymentHistory.map(p => `
                 <tr>
-                    <td colspan="6" class="text-right small">${t('paid')} ${new Date(p.date).toLocaleDateString()}</td>
+                    <td colspan="${footerColSpan}" class="text-right small">${t('paid')} ${new Date(p.date).toLocaleDateString()}</td>
                     <td class="text-right small">${p.amount.toFixed(2)}</td>
                 </tr>
             `).join('');
@@ -188,11 +192,11 @@ const BillViewScreen = () => {
                 const halfRate = taxPercent / 2;
                 taxRows = `
                     <tr>
-                        <td colspan="6" class="text-right bold">CGST (${halfRate}%)</td>
+                        <td colspan="${footerColSpan}" class="text-right bold">CGST (${halfRate}%)</td>
                         <td class="text-right">${halfTax.toFixed(2)}</td>
                     </tr>
                     <tr>
-                        <td colspan="6" class="text-right bold">SGST (${halfRate}%)</td>
+                        <td colspan="${footerColSpan}" class="text-right bold">SGST (${halfRate}%)</td>
                         <td class="text-right">${halfTax.toFixed(2)}</td>
                     </tr>
                 `;
@@ -200,7 +204,7 @@ const BillViewScreen = () => {
                 // IGST (Full)
                 taxRows = `
                     <tr>
-                        <td colspan="6" class="text-right bold">IGST (${taxPercent}%)</td>
+                        <td colspan="${footerColSpan}" class="text-right bold">IGST (${taxPercent}%)</td>
                         <td class="text-right">${totalTax.toFixed(2)}</td>
                     </tr>
                 `;
@@ -311,7 +315,7 @@ const BillViewScreen = () => {
                             <td width="5%">SI No.</td>
                             <td width="35%">Description of Goods</td>
                             <td width="10%">Bags</td>
-                            <td width="10%">Bharti</td>
+                            ${isPurchase ? `<td width="10%">Bharti</td>` : ''}
                             <td width="15%">Quantity</td>
                             <td width="10%">Rate</td>
                             <td width="15%">Amount</td>
@@ -322,7 +326,7 @@ const BillViewScreen = () => {
                         
                         <!-- Empty Rows -->
                         <tr style="height: 100px;">
-                            <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+                            <td></td><td></td><td></td>${isPurchase ? '<td></td>' : ''}<td></td><td></td><td></td>
                         </tr>
 
                         ${isPurchase && (mainTrx.labour_cost_per_bag > 0) ? `
@@ -336,7 +340,7 @@ const BillViewScreen = () => {
 
                         <!-- Total -->
                         <tr>
-                            <td colspan="4" class="text-right bold">Sub Total (Taxable)</td>
+                            <td colspan="${subTotalColSpan}" class="text-right bold">Sub Total (Taxable)</td>
                             <td class="text-right bold">${totalQty.toFixed(2)} QTL</td>
                             <td></td>
                             <td class="text-right bold">${taxableAmount.toFixed(2)}</td>
@@ -347,7 +351,7 @@ const BillViewScreen = () => {
 
                         <!-- Grand Total -->
                         <tr>
-                            <td colspan="6" class="text-right bold" style="background-color: #eee;">Grand Total</td>
+                            <td colspan="${footerColSpan}" class="text-right bold" style="background-color: #eee;">Grand Total</td>
                             <td class="text-right bold" style="background-color: #eee;">${grandTotal.toFixed(2)}</td>
                         </tr>
 
@@ -355,11 +359,11 @@ const BillViewScreen = () => {
                          ${paymentRows}
 
                          <tr>
-                            <td colspan="6" class="text-right bold">Total Amount Paid</td>
+                            <td colspan="${footerColSpan}" class="text-right bold">Total Amount Paid</td>
                             <td class="text-right bold">${(mainTrx.amount_paid || 0).toFixed(2)}</td>
                         </tr>
                         <tr>
-                            <td colspan="6" class="text-right bold">Balance Due</td>
+                            <td colspan="${footerColSpan}" class="text-right bold">Balance Due</td>
                             <td class="text-right bold text-red">${(grandTotal - (mainTrx.amount_paid || 0)).toFixed(2)}</td>
                         </tr>
 
@@ -380,7 +384,7 @@ const BillViewScreen = () => {
                                         </td>
                                         <td style="border: none; border-left: 1px solid black; width: 40%; text-align: right; vertical-align: bottom; padding-left: 10px;">
                                             <div style="height: 80px;"></div>
-                                            <strong>for NAGARIYA TRADERS</strong><br/><br/>
+                                            <strong>for M/S NAGARIYA TRADERS</strong><br/><br/>
                                             Authorised Signatory
                                         </td>
                                     </tr>
@@ -728,7 +732,7 @@ const BillViewScreen = () => {
                         </View>
 
                         <View className="flex-row justify-between mb-1">
-                            <Text className="text-gray-600">Billed Amount ({totalQty.toFixed(2)} Qtl):</Text>
+                            <Text className="text-gray-600">{t('billedAmount')} ({totalQty.toFixed(2)} Qtl):</Text>
                             <Text className="font-bold">₹ {totalAmt.toFixed(2)}</Text>
                         </View>
 
@@ -747,7 +751,7 @@ const BillViewScreen = () => {
                         )}
 
                         <View className="flex-row justify-between">
-                            <Text className="font-bold text-brand-navy text-lg">Net Receivable:</Text>
+                            <Text className="font-bold text-brand-navy text-lg">{t('netReceivable')}:</Text>
                             <Text className="font-bold text-brand-navy text-lg">₹ {getNetReceivable(mainTrx).toFixed(2)}</Text>
                         </View>
                     </View>
@@ -861,7 +865,7 @@ const BillViewScreen = () => {
                     <View className="bg-white w-full rounded-2xl p-6">
                         <Text className="text-xl font-bold text-brand-navy mb-4">{t('updateSettlement')}</Text>
 
-                        <Text className="mb-1 font-bold text-gray-700">{t('shortageQty')} (Qtl)</Text>
+                        <Text className="mb-1 font-bold text-gray-700">{t('shortageQty')}</Text>
                         <TextInput
                             className="border border-gray-300 rounded-lg p-3 mb-4 bg-gray-50 text-lg"
                             keyboardType="numeric"
@@ -870,7 +874,7 @@ const BillViewScreen = () => {
                             placeholder="0.00"
                         />
 
-                        <Text className="mb-1 font-bold text-gray-700">{t('deductionAmount')} (₹)</Text>
+                        <Text className="mb-1 font-bold text-gray-700">{t('deductionAmount')}</Text>
                         <TextInput
                             className="border border-gray-300 rounded-lg p-3 mb-4 bg-gray-50 text-lg"
                             keyboardType="numeric"

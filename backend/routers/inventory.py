@@ -50,35 +50,38 @@ def get_inventory_status(session: Session = Depends(get_session)):
             inventory[gid]["warehouses"][wid] = {"bags": 0, "quintal": 0.0}
 
         qty = trx.quantity_quintal
-        bags = trx.number_of_bags or 0 # Handle legacy/null
+        # We ignore stored 'number_of_bags' for inventory display as per new requirement
+        # We rely on Net Weight to calculate Bags + Loose dynamically
 
         if trx.type == 'purchase':
-            inventory[gid]["total_bags"] += bags
             inventory[gid]["total_quintal"] += qty
             
             # Warehouse specific
-            inventory[gid]["warehouses"][wid]["bags"] += bags
             inventory[gid]["warehouses"][wid]["quintal"] += qty
             
-            # Avg Price Calc (Only add purchases)
-            # Use Gross Amount (Cost to Company) = Qty * Rate
-            # (Previously used total_amount which was Net Payout after Labour deduction)
+            # Avg Price Calc
             inventory[gid]["purchased_value"] += (qty * trx.rate_per_quintal)
             inventory[gid]["purchased_qty"] += qty
             
         elif trx.type == 'sale':
-            inventory[gid]["total_bags"] -= bags
             inventory[gid]["total_quintal"] -= qty
             
             # Warehouse specific
-            inventory[gid]["warehouses"][wid]["bags"] -= bags
             inventory[gid]["warehouses"][wid]["quintal"] -= qty
-
+            
     # Format result
     result = []
     for gid, data in inventory.items():
         grain_obj = grain_map.get(gid)
         if not grain_obj: continue
+        
+        # Calculate derived bags and loose
+        std_bharti = grain_obj.standard_bharti or 60.0
+        
+        # Total
+        net_weight_kg = data["total_quintal"] * 100
+        total_bags = int(net_weight_kg // std_bharti)
+        loose_kg = net_weight_kg % std_bharti
         
         avg_price = 0
         if data["purchased_qty"] > 0 and data["total_quintal"] > 0.01:
@@ -88,11 +91,17 @@ def get_inventory_status(session: Session = Depends(get_session)):
         wh_list = []
         for wid, stats in data["warehouses"].items():
             wh_obj = wh_map.get(wid)
-            if wh_obj and (stats["bags"] != 0 or stats["quintal"] != 0):
+            # Filter zero/near-zero
+            if wh_obj and abs(stats["quintal"]) > 0.001:
+                w_net_kg = stats["quintal"] * 100
+                w_bags = int(w_net_kg // std_bharti)
+                w_loose = w_net_kg % std_bharti
+                
                 wh_list.append({
                     "id": wid,
                     "name": wh_obj.name,
-                    "bags": stats["bags"],
+                    "bags": w_bags,
+                    "loose_kg": round(w_loose, 2),
                     "quintal": stats["quintal"]
                 })
         
@@ -100,7 +109,9 @@ def get_inventory_status(session: Session = Depends(get_session)):
             "grain_id": gid,
             "grain_name": grain_obj.name,
             "hindi_name": grain_obj.hindi_name,
-            "total_bags": data["total_bags"],
+            "total_bags": total_bags,
+            "loose_kg": round(loose_kg, 2),
+            "standard_bharti": std_bharti,
             "total_quintal": data["total_quintal"],
             "average_price": avg_price,
             "warehouses": wh_list

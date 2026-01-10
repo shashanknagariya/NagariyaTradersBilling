@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, Alert, Modal, TextInput, Platform, ScrollView } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import client from '../api/client';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -55,6 +56,10 @@ const ReportsScreen = () => {
     const [analyticsStartDate, setAnalyticsStartDate] = useState('');
     const [analyticsEndDate, setAnalyticsEndDate] = useState('');
     const [reportType, setReportType] = useState('profit'); // profit, purchase, sale, transport
+    const [showStartPicker, setShowStartPicker] = useState(false);
+    const [showEndPicker, setShowEndPicker] = useState(false);
+    const [showFilterStartPicker, setShowFilterStartPicker] = useState(false);
+    const [showFilterEndPicker, setShowFilterEndPicker] = useState(false);
 
     // NEW: Analytics Data
     const [analyticsData, setAnalyticsData] = useState({ summary: {}, groups: [] });
@@ -353,7 +358,8 @@ const ReportsScreen = () => {
                         <th>Inv</th>
                         <th class="text-left">Party</th>
                         <th class="text-left">Grain</th>
-                        <th>Qty</th>
+                        ${reportType === 'purchase' ? '<th>Bharti</th>' : ''}
+                        <th>Total Qty</th>
                         <th>Rate</th>
                         <th>Gross</th>
                         <th>Short</th>
@@ -380,6 +386,7 @@ const ReportsScreen = () => {
                         <td>${d.invoice_number || '-'}</td>
                         <td class="text-left">${d.contactName}</td>
                         <td class="text-left">${d.grainName}</td>
+                        ${reportType === 'purchase' ? `<td>${(d.bharti || 0).toFixed(2)}</td>` : ''}
                         <td>${d.quantity_quintal.toFixed(2)}</td>
                         <td>${d.rate_per_quintal.toFixed(0)}</td>
                         <td>${d.baseAmount.toFixed(0)}</td>
@@ -435,6 +442,7 @@ const ReportsScreen = () => {
                     <td></td><!-- Inv -->
                     <td class="text-left">TOTAL</td><!-- Party -->
                     <td></td><!-- Grain -->
+                    ${reportType === 'purchase' ? '<td></td>' : ''}<!-- Bharti -->
                     <td>${reportData.reduce((sum, d) => sum + d.quantity_quintal, 0).toFixed(2)}</td><!-- Qty -->
                     <td></td><!-- Rate -->
                     <td>${reportData.reduce((sum, d) => sum + d.baseAmount, 0).toFixed(0)}</td><!-- Gross -->
@@ -447,6 +455,10 @@ const ReportsScreen = () => {
                     <td>${reportData.reduce((sum, d) => sum + d.paidAmount, 0).toFixed(0)}</td><!-- Paid -->
                     <td>${reportData.reduce((sum, d) => sum + d.pendingAmount, 0).toFixed(0)}</td><!-- Pending -->
                     <td></td><!-- Status -->
+                    ${reportType === 'profit' ? `
+                        <td></td><!-- Avg Cost -->
+                        <td>${reportData.reduce((sum, d) => sum + d.profit, 0).toFixed(2)}</td><!-- Profit -->
+                    ` : ''}
                 `;
             }
             html += `</tr>`;
@@ -861,18 +873,82 @@ const ReportsScreen = () => {
 
                     {/* Date Filters */}
                     <View className="flex-row px-4 mb-4 space-x-2">
-                        <TextInput
-                            className="flex-1 bg-white p-2 rounded-lg border border-gray-200"
-                            placeholder={t('startDate') + " (YYYY-MM-DD)"}
-                            value={analyticsStartDate}
-                            onChangeText={setAnalyticsStartDate}
-                        />
-                        <TextInput
-                            className="flex-1 bg-white p-2 rounded-lg border border-gray-200"
-                            placeholder={t('endDate') + " (YYYY-MM-DD)"}
-                            value={analyticsEndDate}
-                            onChangeText={setAnalyticsEndDate}
-                        />
+                        {Platform.OS === 'web' ? (
+                            <input
+                                type="date"
+                                value={analyticsStartDate}
+                                onChange={(e) => setAnalyticsStartDate(e.target.value)}
+                                style={{
+                                    flex: 1,
+                                    padding: 8,
+                                    borderRadius: 8,
+                                    border: '1px solid #e5e7eb',
+                                    fontSize: 14,
+                                    marginRight: 8
+                                }}
+                            />
+                        ) : (
+                            <TouchableOpacity
+                                onPress={() => setShowStartPicker(true)}
+                                className="flex-1 bg-white p-2 rounded-lg border border-gray-200"
+                            >
+                                <Text className={analyticsStartDate ? "text-black" : "text-gray-400"}>
+                                    {analyticsStartDate || t('startDate')}
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+
+                        {Platform.OS === 'web' ? (
+                            <input
+                                type="date"
+                                value={analyticsEndDate}
+                                onChange={(e) => setAnalyticsEndDate(e.target.value)}
+                                style={{
+                                    flex: 1,
+                                    padding: 8,
+                                    borderRadius: 8,
+                                    border: '1px solid #e5e7eb',
+                                    fontSize: 14
+                                }}
+                            />
+                        ) : (
+                            <TouchableOpacity
+                                onPress={() => setShowEndPicker(true)}
+                                className="flex-1 bg-white p-2 rounded-lg border border-gray-200"
+                            >
+                                <Text className={analyticsEndDate ? "text-black" : "text-gray-400"}>
+                                    {analyticsEndDate || t('endDate')}
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+
+                        {showStartPicker && (
+                            <DateTimePicker
+                                value={analyticsStartDate ? new Date(analyticsStartDate) : new Date()}
+                                mode="date"
+                                display="default"
+                                onChange={(event, selectedDate) => {
+                                    setShowStartPicker(false);
+                                    if (selectedDate) {
+                                        setAnalyticsStartDate(selectedDate.toISOString().split('T')[0]);
+                                    }
+                                }}
+                            />
+                        )}
+
+                        {showEndPicker && (
+                            <DateTimePicker
+                                value={analyticsEndDate ? new Date(analyticsEndDate) : new Date()}
+                                mode="date"
+                                display="default"
+                                onChange={(event, selectedDate) => {
+                                    setShowEndPicker(false);
+                                    if (selectedDate) {
+                                        setAnalyticsEndDate(selectedDate.toISOString().split('T')[0]);
+                                    }
+                                }}
+                            />
+                        )}
                     </View>
 
                     {loading ? (
@@ -921,7 +997,10 @@ const ReportsScreen = () => {
                                                             <Text className="font-bold w-16 text-gray-700">{t('invoice')}</Text>
                                                             <Text className="font-bold w-28 text-gray-700">{t('buyer')}/{t('supplier')}</Text>
                                                             <Text className="font-bold w-20 text-gray-700">{t('selectGrain')}</Text>
-                                                            <Text className="font-bold w-12 text-right text-gray-700">Qty</Text>
+                                                            {reportType === 'purchase' && (
+                                                                <Text className="font-bold w-12 text-right text-gray-700">{t('bharti')}</Text>
+                                                            )}
+                                                            <Text className="font-bold w-16 text-right text-gray-700">{t('totalQty')}</Text>
                                                             <Text className="font-bold w-12 text-right text-gray-700">Rate</Text>
                                                             <Text className="font-bold w-20 text-right text-brand-navy">{t('gross')}</Text>
                                                             <Text className="font-bold w-16 text-right text-orange-600">{t('shortage')}</Text>
@@ -934,7 +1013,10 @@ const ReportsScreen = () => {
                                                             <Text className="font-bold w-20 text-right text-red-600">{t('pending')}</Text>
                                                             <Text className="font-bold w-16 text-center text-gray-700">{t('status')}</Text>
                                                             {reportType === 'profit' && (
-                                                                <Text className="font-bold w-16 text-right text-gray-700">{t('profit')}</Text>
+                                                                <>
+                                                                    <Text className="font-bold w-16 text-right text-gray-700">{t('avgCost')}</Text>
+                                                                    <Text className="font-bold w-16 text-right text-gray-700">{t('profit')}</Text>
+                                                                </>
                                                             )}
                                                         </>
                                                     )
@@ -976,7 +1058,10 @@ const ReportsScreen = () => {
                                                             <Text className="w-16 text-xs">{d.invoice_number || '-'}</Text>
                                                             <Text className="w-28 text-xs" numberOfLines={1}>{d.contactName || '-'}</Text>
                                                             <Text className="w-20 text-xs" numberOfLines={1}>{d.grainName || '-'}</Text>
-                                                            <Text className="w-12 text-right text-xs">{(d.quantity_quintal || 0).toFixed(0)}</Text>
+                                                            {reportType === 'purchase' && (
+                                                                <Text className="w-12 text-right text-xs">{(d.bharti || 0).toFixed(2)}</Text>
+                                                            )}
+                                                            <Text className="w-16 text-right text-xs">{(d.quantity_quintal || 0).toFixed(2)}</Text>
                                                             <Text className="w-12 text-right text-xs">{(d.rate_per_quintal || 0).toFixed(0)}</Text>
                                                             <Text className="w-20 text-right text-xs font-bold text-brand-navy">{(d.baseAmount || 0).toFixed(0)}</Text>
                                                             <Text className="w-16 text-right text-xs text-orange-600">{(d.shortageCost || 0).toFixed(0)}</Text>
@@ -989,7 +1074,10 @@ const ReportsScreen = () => {
                                                             <Text className="w-20 text-right text-xs text-red-600">{(d.pendingAmount || 0).toFixed(0)}</Text>
                                                             <Text className={`w-16 text-center text-xs font-bold ${d.status === 'Paid' ? 'text-green-600' : d.status === 'Partial' ? 'text-orange-500' : 'text-red-500'}`}>{d.status || 'Pending'}</Text>
                                                             {reportType === 'profit' && (
-                                                                <Text className={`w-16 text-right text-xs font-bold ${(d.profit || 0) >= 0 ? 'text-green-600' : 'text-red-500'}`}>{(d.profit || 0).toFixed(0)}</Text>
+                                                                <>
+                                                                    <Text className="w-16 text-right text-xs">{(d.cost_price_per_quintal || 0).toFixed(0)}</Text>
+                                                                    <Text className={`w-16 text-right text-xs font-bold ${(d.profit || 0) >= 0 ? 'text-green-600' : 'text-red-500'}`}>{(d.profit || 0).toFixed(0)}</Text>
+                                                                </>
                                                             )}
                                                         </>
                                                     )
@@ -1031,7 +1119,10 @@ const ReportsScreen = () => {
                                                                 <Text className="w-16 font-bold"></Text>
                                                                 <Text className="w-28 font-bold text-brand-navy">TOTAL</Text>
                                                                 <Text className="w-20 font-bold"></Text>
-                                                                <Text className="w-12 text-right font-bold">{reportData.reduce((sum, d) => sum + (d.quantity_quintal || 0), 0).toFixed(2)}</Text>
+                                                                {reportType === 'purchase' && (
+                                                                    <Text className="w-12 font-bold"></Text>
+                                                                )}
+                                                                <Text className="w-16 text-right font-bold">{reportData.reduce((sum, d) => sum + (d.quantity_quintal || 0), 0).toFixed(2)}</Text>
                                                                 <Text className="w-12 font-bold"></Text>
                                                                 <Text className="w-20 text-right font-bold text-brand-navy">{reportData.reduce((sum, d) => sum + (d.baseAmount || 0), 0).toFixed(0)}</Text>
                                                                 <Text className="w-16 text-right font-bold text-orange-600">{reportData.reduce((sum, d) => sum + (d.shortageCost || 0), 0).toFixed(0)}</Text>
@@ -1044,7 +1135,10 @@ const ReportsScreen = () => {
                                                                 <Text className="w-20 text-right font-bold text-red-600">{reportData.reduce((sum, d) => sum + (d.pendingAmount || 0), 0).toFixed(0)}</Text>
                                                                 <Text className="w-16 font-bold"></Text>
                                                                 {reportType === 'profit' && (
-                                                                    <Text className="w-16 text-right font-bold">{reportData.reduce((sum, d) => sum + (d.profit || 0), 0).toFixed(0)}</Text>
+                                                                    <>
+                                                                        <Text className="w-16 font-bold"></Text>
+                                                                        <Text className="w-16 text-right font-bold">{reportData.reduce((sum, d) => sum + (d.profit || 0), 0).toFixed(0)}</Text>
+                                                                    </>
                                                                 )}
                                                             </>
                                                         )
@@ -1109,12 +1203,14 @@ const ReportsScreen = () => {
                                         }}
                                     />
                                 ) : (
-                                    <TextInput
+                                    <TouchableOpacity
+                                        onPress={() => setShowFilterStartPicker(true)}
                                         className="bg-gray-100 p-3 rounded-lg border border-gray-200"
-                                        placeholder="2024-01-01"
-                                        value={filterStartDate}
-                                        onChangeText={setFilterStartDate}
-                                    />
+                                    >
+                                        <Text className={filterStartDate ? "text-black" : "text-gray-400"}>
+                                            {filterStartDate || "2024-01-01"}
+                                        </Text>
+                                    </TouchableOpacity>
                                 )}
                             </View>
                             <View className="flex-1">
@@ -1136,15 +1232,45 @@ const ReportsScreen = () => {
                                         }}
                                     />
                                 ) : (
-                                    <TextInput
+                                    <TouchableOpacity
+                                        onPress={() => setShowFilterEndPicker(true)}
                                         className="bg-gray-100 p-3 rounded-lg border border-gray-200"
-                                        placeholder="2024-12-31"
-                                        value={filterEndDate}
-                                        onChangeText={setFilterEndDate}
-                                    />
+                                    >
+                                        <Text className={filterEndDate ? "text-black" : "text-gray-400"}>
+                                            {filterEndDate || "2024-12-31"}
+                                        </Text>
+                                    </TouchableOpacity>
                                 )}
                             </View>
                         </View>
+
+                        {showFilterStartPicker && (
+                            <DateTimePicker
+                                value={filterStartDate ? new Date(filterStartDate) : new Date()}
+                                mode="date"
+                                display="default"
+                                onChange={(event, selectedDate) => {
+                                    setShowFilterStartPicker(false);
+                                    if (selectedDate) {
+                                        setFilterStartDate(selectedDate.toISOString().split('T')[0]);
+                                    }
+                                }}
+                            />
+                        )}
+
+                        {showFilterEndPicker && (
+                            <DateTimePicker
+                                value={filterEndDate ? new Date(filterEndDate) : new Date()}
+                                mode="date"
+                                display="default"
+                                onChange={(event, selectedDate) => {
+                                    setShowFilterEndPicker(false);
+                                    if (selectedDate) {
+                                        setFilterEndDate(selectedDate.toISOString().split('T')[0]);
+                                    }
+                                }}
+                            />
+                        )}
 
                         <TouchableOpacity onPress={() => setFilterModalVisible(false)} className="bg-brand-navy p-4 rounded-xl items-center mb-3">
                             <Text className="text-white font-bold text-lg">{t('apply')}</Text>

@@ -142,7 +142,8 @@ def _get_analytics_data(session: Session, query: AnalyticsQuery, limit: Optional
                 "status": d["status"].title(), # "Paid" vs "paid"
                 "profit": d["profit"],
                 "cost_price_per_quintal": t.cost_price_per_quintal,
-                "bags": t.number_of_bags
+                "bags": t.number_of_bags,
+                "bharti": (t.quantity_quintal * 100 / t.number_of_bags) if (t.number_of_bags and t.number_of_bags > 0) else 0
             })
 
     # Always calculate Groups/Totals on FULL filtered_data (ignore limit for totals)
@@ -213,14 +214,23 @@ def export_analytics(query: AnalyticsQuery, session: Session = Depends(get_sessi
             ])
     else:
         # Detailed Rows
-        headers = ['Date', 'Invoice', 'Party', 'Grain', 'Bags', 'Qty', 'Rate', 'Gross', 'Short', 'Ded', 'Lab', 'Trans', 'Mandi', 'Net Realized', 'Paid', 'Pending', 'Status', 'Profit']
+        headers = ['Date', 'Invoice', 'Party', 'Grain']
+        if query.report_type == 'purchase':
+            headers.append('Bharti')
+        headers.extend(['Bags', 'Total Qty', 'Rate', 'Gross', 'Short', 'Ded', 'Lab', 'Trans', 'Mandi', 'Net Realized', 'Paid', 'Pending', 'Status', 'Profit'])
+        
         writer.writerow(headers)
         for r in data['rows']:
-            writer.writerow([
+            row = [
                 r['date'].isoformat() if r['date'] else '',
                 r['invoice_number'],
                 r['contactName'],
-                r['grainName'],
+                r['grainName']
+            ]
+            if query.report_type == 'purchase':
+                row.append(f"{r['bharti']:.2f}")
+            
+            row.extend([
                 r['bags'],
                 f"{r['quantity_quintal']:.2f}",
                 f"{r['rate_per_quintal']:.2f}",
@@ -236,6 +246,7 @@ def export_analytics(query: AnalyticsQuery, session: Session = Depends(get_sessi
                 r['status'],
                 f"{r['profit']:.2f}"
             ])
+            writer.writerow(row)
             
     output.seek(0)
     

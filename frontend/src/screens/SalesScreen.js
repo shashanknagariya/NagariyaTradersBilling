@@ -22,7 +22,7 @@ const SalesScreen = () => {
     const [allocations, setAllocations] = useState({});
 
     // Inputs
-    const [bharti, setBharti] = useState('60');
+    const [totalWeight, setTotalWeight] = useState(''); // Manual Total Weight Input
     const [rate, setRate] = useState('');
     const [gstRate, setGstRate] = useState('0');
 
@@ -49,7 +49,7 @@ const SalesScreen = () => {
 
     // Computed
     const totalBags = Object.values(allocations).reduce((sum, val) => sum + (parseInt(val) || 0), 0);
-    const totalWeightKg = totalBags * (parseFloat(bharti) || 0);
+    const totalWeightKg = parseFloat(totalWeight) || 0;
     const totalWeightQtl = totalWeightKg / 100;
     const subTotal = totalWeightQtl * (parseFloat(rate) || 0);
     const gstAmount = subTotal * ((parseFloat(gstRate) || 0) / 100);
@@ -114,7 +114,7 @@ const SalesScreen = () => {
             contact_id: selectedBuyer.id,
             grain_id: selectedGrain.id,
             rate_per_quintal: parseFloat(rate),
-            bharti: parseFloat(bharti),
+            total_weight_kg: parseFloat(totalWeight),
             tax_percentage: parseFloat(gstRate) || 0,
             labour_cost_per_bag: parseFloat(labourCost),
             transport_cost_per_qtl: parseFloat(transportCost),
@@ -268,7 +268,7 @@ const SalesScreen = () => {
                 {/* 4. Weight & Rate */}
                 <View className="flex-row justify-between">
                     <View className="w-[48%]">
-                        <LabeledInput label={t('bharti')} value={bharti} onChange={setBharti} keyboardType="numeric" />
+                        <LabeledInput label={t('totalWeight') + " (kg)"} value={totalWeight} onChange={setTotalWeight} keyboardType="numeric" placeholder="0" />
                     </View>
                     <View className="w-[48%]">
                         <Text className="text-brand-navy font-bold mb-2 ml-1">{t('totalWeight')} (Qtl)</Text>

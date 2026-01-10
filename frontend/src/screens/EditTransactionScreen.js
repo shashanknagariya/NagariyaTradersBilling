@@ -225,8 +225,12 @@ const EditTransactionScreen = () => {
                     <Label>{t('noOfBags')}</Label>
                     <Input value={numBags} onChangeText={handleBagsChange} keyboardType="numeric" />
 
-                    <Label>{t('bharti')}</Label>
-                    <Input value={bharti} onChangeText={handleBhartiChange} keyboardType="numeric" placeholder="e.g. 50" />
+                    {!isSale && (
+                        <>
+                            <Label>{t('bharti')}</Label>
+                            <Input value={bharti} onChangeText={handleBhartiChange} keyboardType="numeric" placeholder="e.g. 50" />
+                        </>
+                    )}
 
                     <Label>{t('quantityQtl')}</Label>
                     <Input value={quantityQtl} onChangeText={setQuantityQtl} keyboardType="numeric" />

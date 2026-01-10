@@ -150,3 +150,39 @@
 2026-01-09 17:01:26,803 - auth - INFO - Login successful for user: admin
 2026-01-09 17:15:03,831 - auth - INFO - Login attempt for user: admin
 2026-01-09 17:15:04,809 - auth - INFO - Login successful for user: admin
+2026-01-09 22:18:16,985 - auth - INFO - Login attempt for user: admin
+2026-01-09 22:18:20,177 - auth - INFO - Login successful for user: admin
+2026-01-09 22:25:02,591 - auth - INFO - Login attempt for user: admin
+2026-01-09 22:25:03,510 - auth - INFO - Login successful for user: admin
+2026-01-10 14:13:11,364 - auth - INFO - Login attempt for user: admin
+2026-01-10 14:13:12,564 - auth - INFO - Login successful for user: admin
+2026-01-10 14:13:50,915 - transactions - INFO - Transaction created: PURCHASE 1 (Grain: 1)
+2026-01-10 14:15:20,404 - transactions - INFO - Bulk Sale Created: 1 transactions. Group ID: d677d4f7-cd8f-4d67-94bb-cca6ea51f810
+2026-01-10 20:55:15,681 - main - INFO - Server starting up...
+2026-01-10 20:55:20,677 - main - INFO - Database initialized.
+2026-01-10 21:05:09,250 - auth - INFO - Login attempt for user: admin
+2026-01-10 21:05:10,188 - auth - INFO - Login successful for user: admin
+2026-01-10 21:06:22,066 - transactions - INFO - Transaction created: PURCHASE 2 (Grain: 1)
+2026-01-10 21:08:24,748 - transactions - INFO - Transaction created: PURCHASE 3 (Grain: 1)
+2026-01-10 21:11:26,723 - transactions - INFO - Bulk Sale Created: 1 transactions. Group ID: 20c1f62b-cc24-473c-b591-64b252993769
+2026-01-10 21:18:08,684 - auth - INFO - Login attempt for user: admin
+2026-01-10 21:18:09,656 - auth - INFO - Login successful for user: admin
+2026-01-10 21:19:34,551 - auth - INFO - Login attempt for user: admin
+2026-01-10 21:19:35,401 - auth - INFO - Login successful for user: admin
+2026-01-10 21:27:53,838 - main - INFO - Server shutting down...
+2026-01-10 21:28:07,114 - main - INFO - Server starting up...
+2026-01-10 21:28:11,891 - main - INFO - Database initialized.
+2026-01-10 21:32:28,966 - auth - INFO - Login attempt for user: admin
+2026-01-10 21:32:29,877 - auth - INFO - Login successful for user: admin
+2026-01-10 21:40:57,162 - auth - INFO - Login attempt for user: admin
+2026-01-10 21:40:58,144 - auth - INFO - Login successful for user: admin
+2026-01-10 21:45:15,991 - auth - INFO - Login attempt for user: admin
+2026-01-10 21:45:17,231 - auth - INFO - Login successful for user: admin
+2026-01-10 21:56:35,538 - auth - INFO - Login attempt for user: admin
+2026-01-10 21:56:36,518 - auth - INFO - Login successful for user: admin
+2026-01-10 22:03:56,536 - auth - INFO - Login attempt for user: admin
+2026-01-10 22:03:58,020 - auth - INFO - Login successful for user: admin
+2026-01-10 22:07:13,203 - auth - INFO - Login attempt for user: admin
+2026-01-10 22:07:14,218 - auth - INFO - Login successful for user: admin
+2026-01-10 22:16:50,605 - auth - INFO - Login attempt for user: admin
+2026-01-10 22:16:51,483 - auth - INFO - Login successful for user: admin

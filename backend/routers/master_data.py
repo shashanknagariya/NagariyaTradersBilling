@@ -1,7 +1,6 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from database import get_session
-from models import Grain, Warehouse, Contact
 from models import Grain, Warehouse, Contact
 from typing import List
 import os
@@ -31,6 +30,22 @@ def create_grain(grain: Grain, session: Session = Depends(get_session)):
 def read_grains(session: Session = Depends(get_session)):
     grains = session.exec(select(Grain)).all()
     return grains
+
+@router.put("/grains/{grain_id}", response_model=Grain)
+def update_grain(grain_id: int, updates: Grain, session: Session = Depends(get_session)):
+    grain = session.get(Grain, grain_id)
+    if not grain:
+         raise HTTPException(status_code=404, detail="Grain not found")
+    
+    # Update standard_bharti and name if provided
+    grain.standard_bharti = updates.standard_bharti
+    if updates.name: grain.name = updates.name
+    if updates.hindi_name: grain.hindi_name = updates.hindi_name
+    
+    session.add(grain)
+    session.commit()
+    session.refresh(grain)
+    return grain
 
 # WAREHOUSES
 @router.post("/warehouses", response_model=Warehouse)

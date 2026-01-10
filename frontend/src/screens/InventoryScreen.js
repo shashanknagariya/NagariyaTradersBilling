@@ -118,6 +118,7 @@ const InventoryScreen = () => {
                             </View>
                             <View className="items-end">
                                 <Text className="text-2xl font-bold text-green-700">{item.total_bags} <Text className="text-sm font-normal text-gray-500">{t('bags')}</Text></Text>
+                                <Text className="text-sm text-brand-navy"> + {item.loose_kg} Kg</Text>
                                 <Text className="text-xs text-gray-400">{item.total_quintal.toFixed(2)} Qtl</Text>
                             </View>
                         </TouchableOpacity>
@@ -128,7 +129,10 @@ const InventoryScreen = () => {
                                 {item.warehouses.map(wh => (
                                     <View key={wh.id} className="flex-row justify-between py-2 border-b border-gray-50 last:border-0">
                                         <Text className="text-gray-700">{wh.name}</Text>
-                                        <Text className="font-semibold text-gray-900">{wh.bags} {t('bags')} ({wh.quintal.toFixed(2)} Qtl)</Text>
+                                        <View className="items-end">
+                                            <Text className="font-semibold text-gray-900">{wh.bags} {t('bags')} + {wh.loose_kg} Kg</Text>
+                                            <Text className="text-xs text-gray-400">({wh.quintal.toFixed(2)} Qtl)</Text>
+                                        </View>
                                     </View>
                                 ))}
                                 {item.warehouses.length === 0 && <Text className="text-gray-400 italic">No stock in warehouses</Text>}

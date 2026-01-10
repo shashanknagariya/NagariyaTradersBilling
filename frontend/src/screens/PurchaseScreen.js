@@ -19,6 +19,7 @@ const PurchaseScreen = () => {
     // Inputs
     const [numBags, setNumBags] = useState('');
     const [bharti, setBharti] = useState('60');
+    const [extraQty, setExtraQty] = useState(''); // Extra loose kg
     const [rate, setRate] = useState('');
     const [labourCost, setLabourCost] = useState('3'); // Default 3.0
 
@@ -28,6 +29,7 @@ const PurchaseScreen = () => {
 
     const [newGrainName, setNewGrainName] = useState('');
     const [newGrainHindi, setNewGrainHindi] = useState('');
+    const [newGrainStdBharti, setNewGrainStdBharti] = useState('60');
 
     const [newWarehouseName, setNewWarehouseName] = useState('');
     const [newWarehouseLoc, setNewWarehouseLoc] = useState('');
@@ -53,7 +55,7 @@ const PurchaseScreen = () => {
 
     useEffect(() => {
         calculateTotals();
-    }, [numBags, bharti, rate]);
+    }, [numBags, bharti, rate, extraQty]);
 
     const fetchMasterData = async () => {
         try {
@@ -73,10 +75,11 @@ const PurchaseScreen = () => {
     const calculateTotals = () => {
         const bags = parseFloat(numBags) || 0;
         const kgsPerBag = parseFloat(bharti) || 0;
+        const extra = parseFloat(extraQty) || 0;
         const ratePerQ = parseFloat(rate) || 0;
         const lRate = parseFloat(labourCost) || 0;
 
-        const totalKg = bags * kgsPerBag;
+        const totalKg = (bags * kgsPerBag) + extra;
         const totalQ = totalKg / 100;
 
         // Final Amount = (Weight * Rate) - (Labour * Bags)
@@ -122,7 +125,8 @@ const PurchaseScreen = () => {
         try {
             const res = await client.post('/master/grains', {
                 name: newGrainName,
-                hindi_name: newGrainHindi || null
+                hindi_name: newGrainHindi || null,
+                standard_bharti: parseFloat(newGrainStdBharti) || 60.0
             });
             setGrains([...grains, res.data]);
             setSelectedGrain(res.data);
@@ -130,6 +134,7 @@ const PurchaseScreen = () => {
             setIsGrainModalOpen(false);
             setNewGrainName('');
             setNewGrainHindi('');
+            setNewGrainStdBharti('60');
         } catch (e) {
             Alert.alert("Error", "Failed to create grain");
         }
@@ -174,8 +179,9 @@ const PurchaseScreen = () => {
                 rate_per_quintal: parseFloat(rate),
                 total_amount: parseFloat(totalPrice),
                 payment_status: 'pending',
-                notes: `${numBags} Bags @ ${bharti}kg. Total ${totalWeightKg} Kg`,
-                labour_cost_per_bag: parseFloat(labourCost) || 0
+                notes: `${numBags} Bags @ ${bharti}kg + ${extraQty}kg Loose. Total ${totalWeightKg} Kg`,
+                labour_cost_per_bag: parseFloat(labourCost) || 0,
+                extra_loose_quantity: parseFloat(extraQty) || 0
             });
             if (Platform.OS === 'web') {
                 alert(t('success') + ": " + t('recordSuccess'));
@@ -297,6 +303,17 @@ const PurchaseScreen = () => {
                             </View>
                         </View>
 
+                        <View className="mb-4">
+                            <Text className="text-brand-navy font-bold mb-2 ml-1">{t('extraQty')}</Text>
+                            <TextInput
+                                className={`bg-gray-50 p-4 rounded-xl text-xl border border-gray-200 focus:border-brand-gold ${Platform.OS === 'web' ? 'outline-none' : ''}`}
+                                keyboardType="numeric"
+                                placeholder="0"
+                                value={extraQty}
+                                onChangeText={setExtraQty}
+                            />
+                        </View>
+
                         <Text className="text-brand-navy font-bold mb-2 ml-1">{t('rate')} (₹/Qtl)</Text>
                         <TextInput
                             className={`bg-gray-50 p-4 rounded-xl mb-6 text-xl border border-gray-200 focus:border-brand-gold ${Platform.OS === 'web' ? 'outline-none' : ''}`}
@@ -394,6 +411,17 @@ const PurchaseScreen = () => {
                                 </View>
                             </View>
 
+                            <View className="mb-4">
+                                <Text className="text-brand-navy font-bold mb-2 ml-1">{t('extraQty')}</Text>
+                                <TextInput
+                                    className={`bg-gray-50 p-4 rounded-xl text-xl border border-gray-200 focus:border-brand-gold ${Platform.OS === 'web' ? 'outline-none' : ''}`}
+                                    keyboardType="numeric"
+                                    placeholder="0"
+                                    value={extraQty}
+                                    onChangeText={setExtraQty}
+                                />
+                            </View>
+
                             <Text className="text-brand-navy font-bold mb-2 ml-1">{t('rate')} (₹/Qtl)</Text>
                             <TextInput
                                 className={`bg-gray-50 p-4 rounded-xl mb-6 text-xl border border-gray-200 focus:border-brand-gold ${Platform.OS === 'web' ? 'outline-none' : ''}`}
@@ -457,6 +485,13 @@ const PurchaseScreen = () => {
                                     placeholder={t('hindiName') + " (e.g. Gehu)"}
                                     value={newGrainHindi}
                                     onChangeText={setNewGrainHindi}
+                                />
+                                <TextInput
+                                    className="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-4"
+                                    placeholder={t('stdBharti') + " (Default 60)"}
+                                    keyboardType="numeric"
+                                    value={newGrainStdBharti}
+                                    onChangeText={setNewGrainStdBharti}
                                 />
                                 <TouchableOpacity onPress={handleCreateGrain} className="bg-brand-navy p-4 rounded-xl items-center mb-2">
                                     <Text className="text-white font-bold">{t('saveGrain')}</Text>

@@ -49,7 +49,7 @@ class BulkSaleCreate(BaseModel):
     contact_id: int
     grain_id: int
     rate_per_quintal: float
-    bharti: float # kg per bag
+    total_weight_kg: float # Total weight from weighbridge
     transporter_name: str | None = None
     destination: str | None = None
     driver_name: str | None = None
@@ -74,6 +74,7 @@ class TransactionUpdate(BaseModel):
     vehicle_number: Optional[str] = None
     driver_name: Optional[str] = None
     transporter_name: Optional[str] = None
+    extra_loose_quantity: Optional[float] = None
 
 @router.post("/bulk_sale", response_model=List[Transaction])
 def create_bulk_sale(sale_data: BulkSaleCreate, session: Session = Depends(get_session)):
@@ -92,17 +93,19 @@ def create_bulk_sale(sale_data: BulkSaleCreate, session: Session = Depends(get_s
     max_inv = session.exec(select(func.max(Transaction.invoice_number)).where(Transaction.type == "sale")).first()
     next_inv = (max_inv or 0) + 1
 
-    # Calculate total quantity first for proportional cost distribution
-    total_sale_qty = 0.0
-    for alloc in sale_data.warehouses:
-         qty = (alloc.bags * sale_data.bharti) / 100.0
-         total_sale_qty += qty
+    # Calculate total quantity and bags
+    total_bags = sum(alloc.bags for alloc in sale_data.warehouses)
+    total_sale_qty = sale_data.total_weight_kg / 100.0 # Convert to Quintal
 
     transactions = []
     
-    # 2. Iterate and Create Transactions
+    # 2. Iterate and Create Transactions (Proportional Distribution)
     for alloc in sale_data.warehouses:
-        qty_quintal = (alloc.bags * sale_data.bharti) / 100.0
+        # Avoid division by zero
+        if total_bags > 0:
+            qty_quintal = (alloc.bags / total_bags) * total_sale_qty
+        else:
+            qty_quintal = 0.0
         
         # VALIDATION: Check Stock
         # Calculate available stock for this Grain + Warehouse

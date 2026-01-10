@@ -57,6 +57,9 @@ export const translations = {
         // Costs
         labourCost: "Labour", // Short for Labour Cost
         transportCost: "Transport",
+        extraQty: "Extra Qty (kg)",
+        stdBharti: "Std. Bharti",
+        bagsAndLoose: "{{bags}} Bags + {{loose}} Kg",
         vehicleNo: "Vehicle No",
         driverName: "Driver Name",
         vehicleNo: "Vehicle No",
@@ -174,6 +177,7 @@ export const translations = {
         colPaid: "Paid",
         colPending: "Pending",
         colStatus: "Status",
+        totalQty: "Total Qty",
 
         transportAnalysis: "Transport Analysis",
         colTransporter: "Transporter",
@@ -193,7 +197,18 @@ export const translations = {
         labour: "Labour",
         transport: "Trans.",
         net: "Net",
-        avgCost: "Avg Cost"
+        avgCost: "Avg Cost",
+
+        // Bill View Final Settlement
+        settlementFinal: "Settlement & Final Calculation",
+        billedAmount: "Billed Amount",
+        netReceivable: "Net Receivable",
+        editSettle: "Edit Settlement",
+        updateSettlement: "Update Settlement",
+        shortageQty: "Shortage Qty (Qtl)",
+        deductionAmount: "Deduction Amount (₹)",
+        noteReason: "Note / Reason",
+        closeBill: "Close Bill"
     },
     hi: {
         // Home
@@ -251,6 +266,9 @@ export const translations = {
         // Costs
         labourCost: "पल्लेदारी", // Palledari is the specific term used in mandate
         transportCost: "भाड़ा", // Bhada (Freight/Transport)
+        extraQty: "एक्स्ट्रा (kg)",
+        stdBharti: "मानक भरती",
+        bagsAndLoose: "{{bags}} कट्टे + {{loose}} Kg",
         vehicleNo: "गाड़ी नंबर",
         driverName: "ड्राइवर",
         transporterName: "ट्रांसपोर्टर",
@@ -365,8 +383,9 @@ export const translations = {
         colRate: "रेट",
         colNet: "शुद्ध राशि",
         colPaid: "भुगतान",
-        colPending: "बकाया",
+        colPending: "बकाया", // Remaining/Pending
         colStatus: "स्थिति",
+        totalQty: "वजन (क्विंटल)",
 
         transportAnalysis: "भाड़ा रिपोर्ट",
         colTransporter: "ट्रांसपोर्टर",
@@ -386,6 +405,17 @@ export const translations = {
         labour: "मजदूरी", // Labour
         transport: "भाड़ा", // Transport
         net: "नेट", // Net
-        avgCost: "औसत लागत"
+        avgCost: "औसत लागत",
+
+        // Bill View Final Settlement
+        settlementFinal: "हिसाब और अंतिम गणना",
+        billedAmount: "बिल राशि",
+        netReceivable: "शुद्ध प्राप्त करने योग्य",
+        editSettle: "हिसाब सुधारें",
+        updateSettlement: "हिसाब अपडेट करें",
+        shortageQty: "घट मात्रा (क्विंटल)",
+        deductionAmount: "कटौती राशि (₹)",
+        noteReason: "विवरण / कारण",
+        closeBill: "बिल बंद करें"
     }
 };
