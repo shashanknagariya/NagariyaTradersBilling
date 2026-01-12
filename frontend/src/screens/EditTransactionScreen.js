@@ -124,7 +124,22 @@ const EditTransactionScreen = () => {
         try {
             const qty = parseFloat(quantityQtl);
             const r = parseFloat(rate);
-            const total = qty * r;
+            const bags = parseFloat(numBags) || 0;
+            const lRate = parseFloat(labourCost) || 0;
+
+            // Calc Total
+            const grainVal = qty * r;
+            const labourDed = bags * lRate;
+
+            let total = grainVal;
+            if (!isSale) {
+                // For Purchase: Total = GrainValue - Labour
+                total = grainVal - labourDed;
+            } else {
+                // For Sale: Total = GrainValue (Gross)
+                // Labour is an expense, separate
+                total = grainVal;
+            }
 
             const updatePayload = {
                 date: new Date(date).toISOString(),
@@ -132,11 +147,11 @@ const EditTransactionScreen = () => {
                 grain_id: grainId,
                 warehouse_id: warehouseId,
                 quantity_quintal: qty,
-                number_of_bags: parseFloat(numBags) || 0,
+                number_of_bags: bags,
                 rate_per_quintal: r,
                 total_amount: total,
                 notes: notes,
-                labour_cost_per_bag: parseFloat(labourCost) || 0,
+                labour_cost_per_bag: lRate,
                 transport_cost_per_qtl: parseFloat(transportCost) || 0,
                 mandi_cost: parseFloat(mandiCost) || 0
             };

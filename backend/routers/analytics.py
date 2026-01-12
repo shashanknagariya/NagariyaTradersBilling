@@ -73,7 +73,12 @@ def _get_analytics_data(session: Session, query: AnalyticsQuery, limit: Optional
         # Net Realized
         net_realized = total
         if t.type == 'sale':
-            net_realized = total - shortage_val - deduction
+            # For Sales: Net = Gross (total) - Shortage - Deduction - Labour - Transport - Mandi
+            labour_loss = (t.number_of_bags or 0) * (t.labour_cost_per_bag or 0)
+            transport_loss = qty * (t.transport_cost_per_qtl or 0)
+            mandi_loss = t.mandi_cost or 0
+            
+            net_realized = t.total_amount - shortage_val - deduction - labour_loss - transport_loss - mandi_loss
             
         # Payment Status Logic
         effective_total = net_realized if t.type == 'sale' else total
@@ -130,7 +135,7 @@ def _get_analytics_data(session: Session, query: AnalyticsQuery, limit: Optional
                 "warehouseName": d["warehouse_name"],
                 "quantity_quintal": t.quantity_quintal,
                 "rate_per_quintal": t.rate_per_quintal,
-                "baseAmount": t.total_amount, # Approx logic, accurate baseAmount logic in JS was qty*rate
+                "baseAmount": t.quantity_quintal * t.rate_per_quintal,
                 "shortageCost": (t.shortage_quantity or 0) * t.rate_per_quintal,
                 "deductionCost": t.deduction_amount or 0,
                 "labourCostTotal": (t.number_of_bags or 0) * (t.labour_cost_per_bag or 0),

@@ -186,3 +186,63 @@
 2026-01-10 22:07:14,218 - auth - INFO - Login successful for user: admin
 2026-01-10 22:16:50,605 - auth - INFO - Login attempt for user: admin
 2026-01-10 22:16:51,483 - auth - INFO - Login successful for user: admin
+2026-01-11 17:17:26,874 - auth - INFO - Login attempt for user: admin
+2026-01-11 17:17:30,169 - auth - INFO - Login successful for user: admin
+2026-01-11 17:23:57,695 - auth - INFO - Login attempt for user: admin
+2026-01-11 17:23:58,767 - auth - INFO - Login successful for user: admin
+2026-01-11 17:34:40,203 - auth - INFO - Login attempt for user: admin
+2026-01-11 17:34:41,206 - auth - INFO - Login successful for user: admin
+2026-01-11 17:36:34,523 - transactions - INFO - Transaction updated: 3094
+2026-01-11 17:46:55,956 - main - INFO - Server shutting down...
+2026-01-11 17:47:23,291 - main - INFO - Server starting up...
+2026-01-11 17:47:28,335 - main - INFO - Database initialized.
+2026-01-11 17:55:39,861 - auth - INFO - Login attempt for user: admin
+2026-01-11 17:55:40,860 - auth - INFO - Login successful for user: admin
+2026-01-11 17:57:51,251 - transactions - INFO - Transaction updated: 3093
+2026-01-11 17:58:07,387 - transactions - INFO - Transaction updated: 3095
+2026-01-11 17:58:35,228 - transactions - INFO - Transaction updated: 3096
+2026-01-11 18:10:47,723 - transactions - INFO - Transaction created: PURCHASE 5 (Grain: 1)
+2026-01-11 18:11:44,123 - transactions - INFO - Transaction deleted: 3097
+2026-01-11 20:24:30,884 - master - INFO - Contact created: Pappu sahu (supplier)
+2026-01-11 20:25:31,035 - transactions - INFO - Transaction created: PURCHASE 5 (Grain: 1)
+2026-01-11 20:26:24,680 - master - INFO - Contact created: Sadeep sahu didoniya (supplier)
+2026-01-11 20:26:51,903 - transactions - INFO - Transaction created: PURCHASE 6 (Grain: 1)
+2026-01-11 20:27:57,317 - master - INFO - Contact created: Dev shankar sharma (supplier)
+2026-01-11 20:28:22,408 - transactions - INFO - Transaction created: PURCHASE 7 (Grain: 1)
+2026-01-11 20:28:47,917 - master - INFO - Contact created: Ghanshyam Agrawal (supplier)
+2026-01-11 20:29:26,237 - master - INFO - Contact created: Mangaldeen Kushwaha (supplier)
+2026-01-11 20:30:04,907 - transactions - INFO - Transaction created: PURCHASE 8 (Grain: 1)
+2026-01-11 20:30:33,204 - master - INFO - Contact created: Rajendra yadav Gudpara (supplier)
+2026-01-11 20:31:26,704 - transactions - INFO - Transaction created: PURCHASE 9 (Grain: 1)
+2026-01-11 20:31:57,301 - transactions - INFO - Transaction updated: 3101
+2026-01-11 20:35:13,400 - transactions - INFO - Transaction created: PURCHASE 10 (Grain: 1)
+2026-01-11 20:36:32,541 - master - INFO - Contact created: balli agrawal ganj (supplier)
+2026-01-11 20:37:23,348 - transactions - INFO - Transaction created: PURCHASE 11 (Grain: 1)
+2026-01-11 20:38:00,701 - master - INFO - Contact created: neeraj yadav (supplier)
+2026-01-11 20:38:23,984 - transactions - INFO - Transaction created: PURCHASE 12 (Grain: 1)
+2026-01-11 20:39:00,885 - transactions - INFO - Transaction updated: 3095
+2026-01-11 20:44:27,669 - master - INFO - Contact created: 9JanuaryTak (supplier)
+2026-01-11 20:44:52,025 - transactions - INFO - Transaction created: PURCHASE 13 (Grain: 1)
+2026-01-11 20:45:30,672 - transactions - INFO - Transaction updated: 3102
+2026-01-11 20:45:42,371 - transactions - INFO - Transaction updated: 3103
+2026-01-11 20:45:52,501 - transactions - INFO - Transaction updated: 3104
+2026-01-11 20:46:04,143 - transactions - INFO - Transaction updated: 3105
+2026-01-11 20:48:12,431 - master - INFO - Contact created: Ajay Food Products (Katni) pvt ltd (buyer)
+2026-01-11 20:56:28,479 - transactions - INFO - Dispatch Info updated for group fab78b6c-3735-4d3a-b8f8-658dd3447bc1
+2026-01-11 20:56:28,481 - transactions - INFO - Transaction updated: 3107
+2026-01-11 21:02:55,570 - main - INFO - Server shutting down...
+2026-01-11 21:03:13,155 - main - INFO - Server starting up...
+2026-01-11 21:03:18,024 - main - INFO - Database initialized.
+2026-01-11 21:04:06,098 - auth - INFO - Login attempt for user: admin
+2026-01-11 21:04:06,987 - auth - INFO - Login successful for user: admin
+2026-01-11 21:10:08,095 - transactions - INFO - Dispatch Info updated for group fab78b6c-3735-4d3a-b8f8-658dd3447bc1
+2026-01-11 21:10:08,099 - transactions - INFO - Transaction updated: 3107
+2026-01-11 21:18:58,723 - transactions - INFO - Dispatch Info updated for group fab78b6c-3735-4d3a-b8f8-658dd3447bc1
+2026-01-11 21:18:58,728 - transactions - INFO - Transaction updated: 3107
+2026-01-11 22:05:43,116 - transactions - INFO - Dispatch Info updated for group fab78b6c-3735-4d3a-b8f8-658dd3447bc1
+2026-01-11 22:05:43,116 - transactions - INFO - Transaction updated: 3107
+2026-01-11 22:07:26,502 - main - INFO - Server shutting down...
+2026-01-11 22:07:47,348 - main - INFO - Server starting up...
+2026-01-11 22:07:52,492 - main - INFO - Database initialized.
+2026-01-11 22:09:53,857 - transactions - INFO - Dispatch Info updated for group fab78b6c-3735-4d3a-b8f8-658dd3447bc1
+2026-01-11 22:09:53,860 - transactions - INFO - Transaction updated: 3107

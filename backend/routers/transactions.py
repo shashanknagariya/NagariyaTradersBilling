@@ -389,6 +389,7 @@ class TransactionUpdate(BaseModel):
     deduction_note: Optional[str] = None
     labour_cost_per_bag: Optional[float] = None
     transport_cost_per_qtl: Optional[float] = None
+    mandi_cost: Optional[float] = None
 
 @router.put("/{transaction_id}", response_model=Transaction)
 def update_transaction(transaction_id: int, updates: TransactionUpdate, session: Session = Depends(get_session)):

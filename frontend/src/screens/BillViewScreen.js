@@ -334,7 +334,7 @@ const BillViewScreen = () => {
                             <td colspan="4" class="text-right bold">Less: Labour / Palledari (@ ₹${mainTrx.labour_cost_per_bag}/bag)</td>
                             <td class="text-right bold"></td>
                             <td></td>
-                            <td class="text-right bold text-red">- ${(mainTrx.labour_cost_per_bag * mainTrx.number_of_bags).toFixed(2)}</td>
+                            <td class="text-right bold text-red">- ${(mainTrx.labour_cost_per_bag * totalBags).toFixed(2)}</td>
                         </tr>
                         ` : ''}
 

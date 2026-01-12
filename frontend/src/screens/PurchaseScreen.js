@@ -55,7 +55,7 @@ const PurchaseScreen = () => {
 
     useEffect(() => {
         calculateTotals();
-    }, [numBags, bharti, rate, extraQty]);
+    }, [numBags, bharti, rate, extraQty, labourCost]);
 
     const fetchMasterData = async () => {
         try {
@@ -429,6 +429,15 @@ const PurchaseScreen = () => {
                                 placeholder="0.00"
                                 value={rate}
                                 onChangeText={setRate}
+                            />
+
+                            <Text className="text-brand-navy font-bold mb-2 ml-1">{t('labourCost')} / {t('bags')}</Text>
+                            <TextInput
+                                className={`bg-gray-50 p-4 rounded-xl mb-6 text-xl border border-gray-200 focus:border-brand-gold ${Platform.OS === 'web' ? 'outline-none' : ''}`}
+                                keyboardType="numeric"
+                                placeholder="3.00"
+                                value={labourCost}
+                                onChangeText={setLabourCost}
                             />
 
                             <View className="bg-brand-navy p-5 rounded-xl mb-6 shadow-lg">
